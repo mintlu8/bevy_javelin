@@ -1,0 +1,14 @@
+[package]
+name = "bevy_texture_gen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = { version = "0.16.0", default-features = false, features = ["bevy_image", "bevy_asset", "bevy_render"]}
+fastrand = "2.3.0"
+noise = "0.9.0"
+noiz = "0.1.0"
+
+[dev-dependencies]
+bevy = "0.16.0"
+bevy_rectray = "0.3.0"
