@@ -120,9 +120,9 @@ pub trait ProjectileSpawner: Send + Sync + 'static {
 #[allow(unused_variables)]
 pub trait Projectile: Send + Sync + 'static {
     /// Optional value that is used to calculate `fac` and
-    /// by default sets `is_complete` once `lifetime` reaches `duration`.
+    /// by default sets `is_expired` once `lifetime` reaches `duration`.
     ///
-    /// Keep in mind `fac` is optional and `is_complete` can be overwritten.
+    /// Keep in mind `fac` is optional and `is_expired` can be overwritten.
     fn duration(&self) -> f32 {
         f32::MAX
     }
