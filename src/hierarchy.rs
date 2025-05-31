@@ -1,8 +1,11 @@
 use std::{iter::Copied, slice::Iter};
 
 use bevy::{
-    ecs::{component::Component, entity::Entity, system::Query},
-    transform::components::{GlobalTransform, Transform},
+    ecs::{
+        component::Component, entity::Entity, hierarchy::ChildOf, system::EntityCommands,
+        world::EntityWorldMut,
+    },
+    transform::commands::BuildChildrenTransformExt,
 };
 
 /// Alternative children that does not inherit transform.
@@ -25,27 +28,33 @@ impl<'t> IntoIterator for &'t WorldSpaceChildren {
 #[relationship(relationship_target = WorldSpaceChildren)]
 pub struct WorldSpaceChildOf(Entity);
 
-/// Record world space parent's [`Transform`].
-#[derive(Debug, Clone, Copy, Component)]
-pub struct ParentTransform(pub Transform);
-
-/// Record world space parent's [`GlobalTransform`].
-#[derive(Debug, Clone, Copy, Component)]
-pub struct ParentGlobalTransform(pub GlobalTransform);
-
-pub fn record_transforms(
-    mut transform: Query<(&WorldSpaceChildOf, &mut ParentTransform)>,
-    mut global: Query<(&WorldSpaceChildOf, &mut ParentGlobalTransform)>,
-    query: Query<(&Transform, &GlobalTransform)>,
-) {
-    for (parent, mut record) in &mut transform {
-        if let Ok((transform, _)) = query.get(parent.0) {
-            record.0 = *transform;
-        }
+impl WorldSpaceChildOf {
+    pub fn parent(&self) -> Entity {
+        self.0
     }
-    for (parent, mut record) in &mut global {
-        if let Ok((_, global)) = query.get(parent.0) {
-            record.0 = *global;
-        }
+}
+
+pub trait DetachToWorldSpaceExt {
+    fn detach_to_world_space(&mut self) -> &mut Self;
+}
+
+impl DetachToWorldSpaceExt for EntityWorldMut<'_> {
+    fn detach_to_world_space(&mut self) -> &mut Self {
+        let Some(parent) = self.get::<ChildOf>() else {
+            return self;
+        };
+        let parent = parent.parent();
+        self.remove_parent_in_place();
+        self.insert(WorldSpaceChildOf(parent));
+        self
+    }
+}
+
+impl DetachToWorldSpaceExt for EntityCommands<'_> {
+    fn detach_to_world_space(&mut self) -> &mut Self {
+        self.queue(|mut x: EntityWorldMut<'_>| {
+            x.detach_to_world_space();
+        });
+        self
     }
 }

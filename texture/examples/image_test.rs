@@ -38,20 +38,23 @@ static WIDE: LazyImage = lazy_image!(1024, 512, PerlinImage::new());
 static TALL: LazyImage = lazy_image!(512, 1024, PerlinImage::new());
 static FBM: LazyImage = lazy_image!(512, 512, FbmNoiseImage::<Perlin>::new());
 
-static VORONOI: LazyImage = lazy_image!(512, 512, VoronoiImage::new());
-static VORONOI3D: LazyImage = lazy_image!(512, 512, VoronoiImage::new3d_seeded(88));
+static VORONOI: LazyImage = lazy_image!(512, 512, VoronoiImage::new(5));
+static VORONOI3D: LazyImage = lazy_image!(512, 512, VoronoiImage::new3d_seeded(5, 88));
 
 static DISTORT_VORONOI: LazyImage = lazy_image!(
     512,
     512,
-    VoronoiImage::new().distort(
+    VoronoiImage::new(4).distort(
         FbmNoiseImage::<Perlin>::new_seeded(0).amplify(0.1),
         FbmNoiseImage::<Perlin>::new_seeded(1).amplify(0.1),
     )
 );
 
-static VORONOI_DISSOLVE: LazyImage =
-    lazy_image!(512, 512, VoronoiImage::new3d().map_value(|_, x| x.powf(3.)));
+static VORONOI_DISSOLVE: LazyImage = lazy_image!(
+    512,
+    512,
+    VoronoiImage::new3d(5).map_value(|_, x| x.powf(3.))
+);
 
 pub fn init(mut commands: Commands) {
     commands.spawn(Camera2d);

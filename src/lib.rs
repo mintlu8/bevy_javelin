@@ -5,7 +5,6 @@ use bevy::{
     ecs::{
         entity::Entity,
         query::Without,
-        schedule::IntoScheduleConfigs,
         system::{
             Commands, FilteredResourcesMutParamBuilder, ParamBuilder, Query, SystemParamBuilder,
         },
@@ -32,12 +31,12 @@ type DefaultProjectileBundle = (ProjectileInstance, Transform, GlobalTransform);
 pub fn projectile_update(
     mut resources: FilteredResourcesMut,
     mut commands: Commands,
-    mut query: Query<(
+    query: Query<(
         Entity,
-        &mut ProjectileInstance,
-        &mut Transform,
-        &GlobalTransform,
-        EntityMutExcept<DefaultProjectileBundle>,
+        &'static mut ProjectileInstance,
+        &'static mut Transform,
+        &'static GlobalTransform,
+        EntityMutExcept<'static, DefaultProjectileBundle>,
     )>,
     mut tracking: Query<
         (&'static Transform, &'static GlobalTransform),
@@ -47,7 +46,10 @@ pub fn projectile_update(
     let Ok(dt) = resources.get::<Time<Virtual>>().map(|x| x.delta_secs()) else {
         return;
     };
-    for (entity, projectile, transform, global_transform, entity_mut) in query.iter_mut() {
+    // Safety: cannot access the same entity, enforced by `ProjectileContext`.
+    for (entity, projectile, transform, global_transform, entity_mut) in
+        unsafe { query.iter_unsafe() }
+    {
         // Allow split borrow.
         let projectile = projectile.into_inner();
         if projectile.done {
@@ -63,6 +65,8 @@ pub fn projectile_update(
             entity_mut,
             resources: resources.reborrow(),
             commands: commands.reborrow(),
+            // Safety: cannot access the same entity, enforced by `ProjectileContext`.
+            unsafe_other: unsafe { query.reborrow_unsafe() },
             tracking: tracking.reborrow(),
             lifetime: projectile.lifetime,
             rc: &projectile.rc,
@@ -90,7 +94,6 @@ impl Plugin for ProjectilePlugin {
         )
             .build_state(app.world_mut())
             .build_system(projectile_update);
-        app.add_systems(Update, record_transforms);
-        app.add_systems(Update, system.after(record_transforms));
+        app.add_systems(Update, system);
     }
 }

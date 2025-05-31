@@ -1,10 +1,10 @@
 use std::{
-    any::type_name,
+    any::{type_name, Any},
     ops::{Deref, DerefMut},
     sync::{Arc, Weak},
 };
 
-use bevy::{ecs::component::Component, render::view::Visibility, transform::components::Transform};
+use bevy::{ecs::{component::Component, world::Mut}, render::view::Visibility, transform::components::Transform};
 
 use crate::{ProjectileBundle, ProjectileContext, WorldSpaceChildOf};
 
@@ -21,13 +21,13 @@ pub enum ProjectileSpace {
 }
 
 /// The core projectile spawner trait.
-/// 
+///
 /// A [`Projectile`] can also be a spawner via implementing [`Projectile::as_spawner`].
-/// 
+///
 /// If a spawner is not a projectile, use [`ProjectileInstance::spawner`] to type erase and spawn it.
-/// 
+///
 /// # How to implement
-/// 
+///
 /// The simplist way to implement this trait is to use [`SpawnRate`](crate::util::SpawnRate).
 /// We call `SpawnRate::update` in `update_spawner` and use `SpawnRate::spawn` in `spawn_projectile`.`
 #[allow(unused_variables)]
@@ -76,7 +76,7 @@ pub trait ProjectileSpawner: Send + Sync + 'static {
 
     /// Runs every frame to update its content.
     /// If is also a projectile, run after `update_projectile`.
-    fn update_spawner(&mut self, cx: &ProjectileContext, dt: f32) {}
+    fn update_spawner(&mut self, cx: &mut ProjectileContext, dt: f32) {}
 
     /// Optional value that is used to calculate `fac` and
     /// by default sets `is_complete` once `lifetime` reaches `duration`.
@@ -156,9 +156,11 @@ pub trait Projectile: Send + Sync + 'static {
 }
 
 pub trait ErasedProjectile: Send + Sync + 'static {
-    fn type_name(&self) -> &'static str {
-        type_name::<Self>()
-    }
+    fn type_name(&self) -> &'static str;
+
+    fn as_any(&self) -> &dyn Any;
+
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 
     /// Returns true if done.
     fn update(&mut self, cx: ProjectileContext, dt: f32) -> bool;
@@ -255,6 +257,19 @@ impl ProjectileInstance {
             root: true,
         }
     }
+
+    pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+        self.projectile.as_any().downcast_ref()
+    }
+
+
+    pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.projectile.as_any_mut().downcast_mut()
+    }
+
+    pub fn map_mut<T: 'static>(this: Mut<Self>) -> Option<Mut<T>> {
+        Mut::filter_map_unchanged(this, |x| x.projectile.as_any_mut().downcast_mut())
+    }
 }
 
 impl Deref for ProjectileInstance {
@@ -277,6 +292,18 @@ impl<T: ProjectileSpawner> ErasedProjectile for ErasedSpawner<T> {
     fn update(&mut self, mut cx: ProjectileContext, dt: f32) -> bool {
         update_spawner(&mut self.0, &mut cx, dt);
         spawner_done(&mut self.0, &cx)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        &self.0
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        &mut self.0
+    }
+
+    fn type_name(&self) -> &'static str {
+        type_name::<T>()
     }
 }
 
@@ -302,6 +329,18 @@ impl<T: Projectile> ErasedProjectile for ErasedProjectileInst<T> {
         } else {
             self.expired
         }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+       &self.projectile
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        &mut self.projectile
+    }
+
+    fn type_name(&self) -> &'static str {
+        type_name::<T>()
     }
 }
 

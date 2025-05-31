@@ -7,7 +7,7 @@ edition = "2024"
 bevy = { version = "0.16.0", default-features = false, features = ["bevy_image", "bevy_asset", "bevy_render"]}
 fastrand = "2.3.0"
 noise = "0.9.0"
-noiz = "0.1.0"
+noiz = "0.2.0"
 
 [dev-dependencies]
 bevy = "0.16.0"

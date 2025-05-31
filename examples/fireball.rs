@@ -15,7 +15,7 @@ use bevy_javelin::{
     Projectile, ProjectileBundle, ProjectileContext, ProjectileInstance, ProjectilePlugin,
     ProjectileSpawner,
     loading::{AddMat3, AddMesh3, LoadMesh3},
-    util::{PhysicsExt, ProjectileRng, SpawnRate},
+    util::{ConditionOnce, PhysicsExt, ProjectileRng, SpawnRate},
 };
 use bevy_texture_gen::{
     FbmPerlinImage, ImageBuilder, LazyImage, LoadLazyImageExt, VoronoiImage, lazy_image,
@@ -47,9 +47,7 @@ fn main() {
 static FIREBALL_TEX: LazyImage = lazy_image!(
     256,
     256,
-    VoronoiImage::new()
-        .set_frequency(4.)
-        .map_value(|_, x| x.powi(3)),
+    VoronoiImage::new(4).map_value(|_, x| x.powi(3)),
     Repeat,
     Repeat
 );
@@ -62,13 +60,8 @@ static FIREBALL_NOISE: LazyImage = lazy_image!(
     Repeat
 );
 
-static NOISE_TEX: LazyImage = lazy_image!(
-    256,
-    256,
-    VoronoiImage::new().set_frequency(4.).alpha_white(),
-    Repeat,
-    Repeat
-);
+static NOISE_TEX: LazyImage =
+    lazy_image!(256, 256, VoronoiImage::new(4).alpha_white(), Repeat, Repeat);
 
 #[derive(Debug, Component)]
 struct Target;
@@ -188,7 +181,7 @@ impl ProjectileSpawner for FireballSpawner {
             (
                 HomingFireball {
                     target: self.enemy,
-                    hit: false,
+                    hit: ConditionOnce::new(),
                     smoke_spawning: SpawnRate::new(12.0),
                     rng: self.rng.fork(),
                 },
@@ -209,32 +202,31 @@ impl ProjectileSpawner for FireballSpawner {
         })
     }
 
-    fn update_spawner(&mut self, _: &ProjectileContext, dt: f32) {
+    fn update_spawner(&mut self, _: &mut ProjectileContext, dt: f32) {
         self.rate.update(dt);
     }
 }
 
 struct HomingFireball {
     target: Entity,
-    hit: bool,
+    hit: ConditionOnce,
     smoke_spawning: SpawnRate,
     rng: Rng,
 }
 
 impl Projectile for HomingFireball {
     fn is_expired(&self, _: &ProjectileContext) -> bool {
-        self.hit
+        self.hit.is_activated()
     }
 
     fn update_projectile(&mut self, cx: &mut ProjectileContext, dt: f32) {
-        let Some((_, transform)) = cx.transform_of(self.target) else {
+        let Some(transform) = cx.global_transform_of(self.target) else {
             return;
         };
         let target = transform.translation();
         cx.transform_mut().translation.move_near(target, dt * 6.);
-        if (cx.transform().translation - target).length_squared() < 0.5 {
-            self.hit = true;
-        }
+        self.hit
+            .set(|| (cx.transform().translation - target).length_squared() < 0.5);
         self.smoke_spawning.update(dt);
     }
 

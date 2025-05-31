@@ -61,7 +61,7 @@ impl ProjectileSpawner for MySpawner {
         false
     }
 
-    fn update_spawner(&mut self, _: &ProjectileContext, dt: f32) {
+    fn update_spawner(&mut self, _: &mut ProjectileContext, dt: f32) {
         self.rate.update(dt);
     }
 
@@ -132,7 +132,7 @@ impl Projectile for MyProjectile {
 }
 
 impl ProjectileSpawner for MyProjectile {
-    fn update_spawner(&mut self, _: &ProjectileContext, dt: f32) {
+    fn update_spawner(&mut self, _: &mut ProjectileContext, dt: f32) {
         self.spawn_rate.update(dt);
     }
 

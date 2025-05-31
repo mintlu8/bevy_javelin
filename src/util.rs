@@ -23,6 +23,9 @@ pub trait ProjectileRng {
     /// Create a random 2d vector inside a (1, 1) circle.
     fn random_in_circle(&mut self) -> Vec2;
 
+    /// Create a random tangent vector.
+    fn random_tangent(&mut self, points_to: Vec3) -> Vec3;
+
     /// Create a random 3d unit vector near a direction.
     fn random_cone(&mut self, points_to: Vec3, angle: f32) -> Vec3;
 
@@ -42,6 +45,13 @@ impl ProjectileRng for Rng {
         let r = self.f32().sqrt();
         let (s, c) = (self.f32() * 2. * PI).sin_cos();
         Vec2::new(r * c, r * s)
+    }
+
+    fn random_tangent(&mut self, points_to: Vec3) -> Vec3 {
+        let theta = self.f32() * 2. * PI;
+        let (sin, cos) = theta.sin_cos();
+        let v = Vec3::new(sin, cos, 0.);
+        Quat::from_rotation_arc(Vec3::Z, points_to).mul_vec3(v)
     }
 
     fn random_cone(&mut self, points_to: Vec3, angle: f32) -> Vec3 {
@@ -236,4 +246,34 @@ where
     B: Copy + Add<B, Output = B> + Sub<B, Output = B>,
 {
     (value - from.start) / (from.end - from.start) * (to.end - to.start) + to.start
+}
+
+/// A condition or action that can only be activated once from `false` to `true`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ConditionOnce(bool);
+
+impl ConditionOnce {
+    pub const fn new() -> ConditionOnce {
+        ConditionOnce(false)
+    }
+
+    pub fn if_then<T>(&mut self, cond: bool, then: impl FnOnce() -> T) -> Option<T> {
+        if !self.0 && cond {
+            self.0 = true;
+            Some(then())
+        } else {
+            None
+        }
+    }
+
+    pub fn is_activated(&self) -> bool {
+        self.0
+    }
+
+    pub fn set(&mut self, condition: impl FnOnce() -> bool) -> bool {
+        if !self.0 {
+            self.0 = condition()
+        }
+        self.0
+    }
 }
