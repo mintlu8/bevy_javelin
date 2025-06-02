@@ -3,7 +3,8 @@ use bevy_javelin::{
     Projectile, ProjectileBundle, ProjectileContext, ProjectileInstance, ProjectilePlugin,
     ProjectileSpawner,
     loading::{AddMat3, AddMesh3},
-    util::{PhysicsExt, ProjectileRng, SpawnRate},
+    spawning::{ProjectileSpawning, SpawnRate},
+    util::{PhysicsExt, ProjectileRng},
 };
 use fastrand::Rng;
 
@@ -61,7 +62,7 @@ impl ProjectileSpawner for MySpawner {
         false
     }
 
-    fn update_spawner(&mut self, _: &mut ProjectileContext, dt: f32) {
+    fn update(&mut self, _: &mut ProjectileContext, dt: f32) {
         self.rate.update(dt);
     }
 
@@ -132,7 +133,7 @@ impl Projectile for MyProjectile {
 }
 
 impl ProjectileSpawner for MyProjectile {
-    fn update_spawner(&mut self, _: &mut ProjectileContext, dt: f32) {
+    fn update(&mut self, _: &mut ProjectileContext, dt: f32) {
         self.spawn_rate.update(dt);
     }
 

@@ -4,7 +4,7 @@ use bevy::{
         bundle::Bundle,
         change_detection::DetectChanges,
         component::{Component, Mutable},
-        entity::Entity,
+        entity::{ContainsEntity, Entity, EntityEquivalent},
         hierarchy::ChildOf,
         query::Without,
         relationship::{Relationship, RelationshipTarget},
@@ -34,6 +34,7 @@ pub struct ProjectileContext<'w, 's> {
     pub(crate) resources: FilteredResourcesMut<'w, 's>,
     pub(crate) tracking:
         Query<'w, 's, (&'static Transform, &'static GlobalTransform), Without<ProjectileInstance>>,
+    // Safety: cannot offer access to this entity.
     pub(crate) unsafe_other: Query<
         'w,
         's,
@@ -192,14 +193,14 @@ impl ProjectileContext<'_, '_> {
     }
 
     /// Obtain the [`Transform`] of an external entity, must not contain a [`ProjectileInstance`].
-    /// 
+    ///
     /// If not present, returns the default value.
     pub fn transform_of(&self, entity: Entity) -> Option<Transform> {
         self.tracking.get(entity).map(|x| *x.0).ok()
     }
 
     /// Obtain the [`GlobalTransform`] of an external entity, must not contain a [`ProjectileInstance`].
-    /// 
+    ///
     /// If not present, returns the default value.
     pub fn global_transform_of(&self, entity: Entity) -> Option<GlobalTransform> {
         self.tracking.get(entity).map(|x| *x.1).ok()
@@ -315,9 +316,9 @@ impl ProjectileContext<'_, '_> {
     }
 
     /// Spawn a related entity, bypass the projectile system.
-    pub fn spawn_related<R: Relationship>(&mut self, bundle: impl Bundle) {
+    pub fn spawn_related<R: Relationship>(&mut self, bundle: impl Bundle) -> Entity {
         let entity = self.entity();
-        self.commands.entity(entity).with_related::<R>(bundle);
+        self.commands.entity(entity).with_related::<R>(bundle).id()
     }
 
     /// Replace local space parent with world space parent, without changing [`GlobalTransform`].
@@ -332,9 +333,9 @@ impl ProjectileContext<'_, '_> {
     }
 
     /// Iterate over child projectiles and apply [`EntityCommands`].
-    /// 
-    /// Filter for projectiles of type `P`.
-    pub fn for_each<T: RelationshipTarget, P: 'static>(
+    ///
+    /// Filters for projectiles of type `P`.
+    pub fn children<T: RelationshipTarget, P: 'static>(
         &mut self,
         mut f: impl FnMut(
             Mut<P>,
@@ -351,7 +352,9 @@ impl ProjectileContext<'_, '_> {
                 if entity == this {
                     continue;
                 }
-                let Ok((_, projectile, transform, global, entity_mut)) = self.unsafe_other.get_mut(entity) else {
+                let Ok((_, projectile, transform, global, entity_mut)) =
+                    self.unsafe_other.get_mut(entity)
+                else {
                     continue;
                 };
                 let Some(projectile) = ProjectileInstance::map_mut(projectile) else {
@@ -360,6 +363,40 @@ impl ProjectileContext<'_, '_> {
                 let commands = self.commands.entity(entity);
                 f(projectile, transform, global, entity_mut, commands);
             }
+        }
+    }
+
+    /// Iterate over child projectiles and apply [`EntityCommands`].
+    ///
+    /// Filter for projectiles of type `P`.
+    pub fn iter_children<P: 'static>(
+        &mut self,
+        children: impl IntoIterator<Item: EntityEquivalent>,
+        mut f: impl FnMut(
+            Mut<P>,
+            Mut<Transform>,
+            &GlobalTransform,
+            EntityMutExcept<DefaultProjectileBundle>,
+            EntityCommands,
+        ),
+    ) {
+        let this = self.entity();
+        for entity in children {
+            let entity = entity.entity();
+            // Safety: checks entity is not this.
+            if entity == this {
+                continue;
+            }
+            let Ok((_, projectile, transform, global, entity_mut)) =
+                self.unsafe_other.get_mut(entity)
+            else {
+                continue;
+            };
+            let Some(projectile) = ProjectileInstance::map_mut(projectile) else {
+                continue;
+            };
+            let commands = self.commands.entity(entity);
+            f(projectile, transform, global, entity_mut, commands);
         }
     }
 }

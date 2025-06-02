@@ -5,6 +5,7 @@ use bevy::{
     ecs::{
         entity::Entity,
         query::Without,
+        schedule::IntoScheduleConfigs,
         system::{
             Commands, FilteredResourcesMutParamBuilder, ParamBuilder, Query, SystemParamBuilder,
         },
@@ -15,11 +16,14 @@ use bevy::{
 };
 
 mod bundle;
+mod cluster;
 mod control;
 mod hierarchy;
+pub mod spawning;
 mod traits;
 pub mod util;
 pub use bundle::{BundleOrAsset, ProjectileBundle};
+use cluster::{ProjectileCommand, projectile_command_system};
 pub use control::ProjectileContext;
 pub use fastrand::Rng;
 pub use hierarchy::*;
@@ -84,6 +88,7 @@ pub struct ProjectilePlugin;
 
 impl Plugin for ProjectilePlugin {
     fn build(&self, app: &mut App) {
+        app.add_event::<ProjectileCommand>();
         let system = (
             FilteredResourcesMutParamBuilder::new(|builder| {
                 builder.add_write_all();
@@ -94,6 +99,7 @@ impl Plugin for ProjectilePlugin {
         )
             .build_state(app.world_mut())
             .build_system(projectile_update);
-        app.add_systems(Update, system);
+        app.add_systems(Update, projectile_command_system);
+        app.add_systems(Update, system.after(projectile_command_system));
     }
 }

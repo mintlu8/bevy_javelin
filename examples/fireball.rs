@@ -15,7 +15,8 @@ use bevy_javelin::{
     Projectile, ProjectileBundle, ProjectileContext, ProjectileInstance, ProjectilePlugin,
     ProjectileSpawner,
     loading::{AddMat3, AddMesh3, LoadMesh3},
-    util::{ConditionOnce, PhysicsExt, ProjectileRng, SpawnRate},
+    spawning::{ProjectileSpawning, SpawnRate},
+    util::{ConditionOnce, PhysicsExt, ProjectileRng},
 };
 use bevy_texture_gen::{
     FbmPerlinImage, ImageBuilder, LazyImage, LoadLazyImageExt, VoronoiImage, lazy_image,
@@ -202,7 +203,7 @@ impl ProjectileSpawner for FireballSpawner {
         })
     }
 
-    fn update_spawner(&mut self, _: &mut ProjectileContext, dt: f32) {
+    fn update(&mut self, _: &mut ProjectileContext, dt: f32) {
         self.rate.update(dt);
     }
 }

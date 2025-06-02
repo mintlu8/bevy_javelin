@@ -1,11 +1,10 @@
 use bevy::{math::VectorSpace, prelude::*};
 use bevy_javelin::{
-    Projectile, ProjectileBundle, ProjectileContext, ProjectileInstance, ProjectilePlugin,
-    ProjectileSpawner,
+    Projectile, ProjectileContext, ProjectileInstance, ProjectilePlugin,
     loading::{AddMat3, AddMesh3},
-    util::{PhysicsExt, ProjectileRng, SpawnRate},
+    spawning::{ProjectileSpawning, SpawnRate},
+    util::{PhysicsExt, ProjectileRng},
 };
-use fastrand::Rng;
 
 fn main() {
     App::new()
@@ -38,38 +37,11 @@ fn setup(
         Transform::from_translation(Vec3::new(10., 10., -10.)).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
-    commands.spawn(ProjectileInstance::spawner(MySpawner {
-        rate: SpawnRate::new(4.),
-        rng: Rng::new(),
-    }));
-
-    // ground plane
-    commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(50.0, 50.0).subdivisions(10))),
-        MeshMaterial3d(materials.add(StandardMaterial::from_color(Srgba::GREEN))),
-        Transform::from_xyz(0., 0., 0.),
-    ));
-}
-
-struct MySpawner {
-    rate: SpawnRate,
-    rng: Rng,
-}
-
-impl ProjectileSpawner for MySpawner {
-    fn is_complete(&self, _: &ProjectileContext) -> bool {
-        false
-    }
-
-    fn update_spawner(&mut self, _: &mut ProjectileContext, dt: f32) {
-        self.rate.update(dt);
-    }
-
-    fn spawn_projectile(&mut self, _: &ProjectileContext) -> Option<impl ProjectileBundle + use<>> {
-        self.rate.spawn(|| {
+    commands.spawn(ProjectileInstance::spawner(
+        SpawnRate::new(4.).into_spawner_world(|rng, _| {
             (
                 MyProjectile {
-                    velocity: (self.rng.random_circle() * 4.).extend(10.0).xzy(),
+                    velocity: (rng.random_circle() * 4.).extend(10.0).xzy(),
                 },
                 AddMesh3(Mesh::from(Sphere::new(0.5).mesh())),
                 AddMat3(StandardMaterial {
@@ -77,8 +49,15 @@ impl ProjectileSpawner for MySpawner {
                     ..Default::default()
                 }),
             )
-        })
-    }
+        }),
+    ));
+
+    // ground plane
+    commands.spawn((
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(50.0, 50.0).subdivisions(10))),
+        MeshMaterial3d(materials.add(StandardMaterial::from_color(Srgba::GREEN))),
+        Transform::from_xyz(0., 0., 0.),
+    ));
 }
 
 struct MyProjectile {
