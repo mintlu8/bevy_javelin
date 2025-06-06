@@ -15,14 +15,17 @@ use bevy::{
     transform::components::{GlobalTransform, Transform},
 };
 
+mod builder;
 mod bundle;
 mod cluster;
 mod control;
 mod hierarchy;
+pub use builder::WithSpawner;
 pub mod spawning;
 mod traits;
 pub mod util;
 pub use bundle::{BundleOrAsset, ProjectileBundle};
+pub use cluster::SpawnerCluster;
 use cluster::{ProjectileCommand, projectile_command_system};
 pub use control::ProjectileContext;
 pub use fastrand::Rng;
@@ -47,7 +50,10 @@ pub fn projectile_update(
         Without<ProjectileInstance>,
     >,
 ) {
-    let Ok(dt) = resources.get::<Time<Virtual>>().map(|x| x.delta_secs()) else {
+    let Ok((dt, elapsed)) = resources
+        .get::<Time<Virtual>>()
+        .map(|x| (x.delta_secs(), x.elapsed_secs()))
+    else {
         return;
     };
     // Safety: cannot access the same entity, enforced by `ProjectileContext`.
@@ -72,6 +78,7 @@ pub fn projectile_update(
             // Safety: cannot access the same entity, enforced by `ProjectileContext`.
             unsafe_other: unsafe { query.reborrow_unsafe() },
             tracking: tracking.reborrow(),
+            elapsed_time: elapsed,
             lifetime: projectile.lifetime,
             rc: &projectile.rc,
             fac: 0.,

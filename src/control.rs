@@ -11,6 +11,7 @@ use bevy::{
         system::{Command, Commands, EntityCommands, Query},
         world::{EntityMutExcept, FilteredResourcesMut, Mut},
     },
+    math::Vec3,
     pbr::{Material, MeshMaterial3d},
     render::{
         mesh::{Mesh, Mesh2d, Mesh3d},
@@ -48,6 +49,7 @@ pub struct ProjectileContext<'w, 's> {
     >,
     pub(crate) commands: Commands<'w, 's>,
     pub(crate) rc: &'s ProjectileRc,
+    pub(crate) elapsed_time: f32,
     pub(crate) lifetime: f32,
     pub(crate) fac: f32,
 }
@@ -61,6 +63,14 @@ impl ProjectileContext<'_, '_> {
     /// Obtain the amount of time this projectile or spawner has stayed alive.
     pub fn lifetime(&self) -> f32 {
         self.lifetime
+    }
+
+    /// Returns the amount of second elapsed.
+    ///
+    /// Since time is always exported in shaders by bevy's `global`,
+    /// this can be a simple way to animate effects without updating manually.
+    pub fn elapsed_seconds(&self) -> f32 {
+        self.elapsed_time
     }
 
     /// Obtain `lifetime / duration`.
@@ -131,7 +141,7 @@ impl ProjectileContext<'_, '_> {
     }
 
     /// Obtain a component on the current entity.
-    pub fn get_component<C: Component<Mutability = Mutable>>(&self) -> Option<&C> {
+    pub fn get_component<C: Component>(&self) -> Option<&C> {
         self.entity_mut.get::<C>()
     }
 
@@ -204,6 +214,20 @@ impl ProjectileContext<'_, '_> {
     /// If not present, returns the default value.
     pub fn global_transform_of(&self, entity: Entity) -> Option<GlobalTransform> {
         self.tracking.get(entity).map(|x| *x.1).ok()
+    }
+
+    /// Obtain the global translation of an external entity, must not contain a [`ProjectileInstance`].
+    ///
+    /// If not present, returns the default value.
+    pub fn translation_of(&self, entity: Entity) -> Option<Vec3> {
+        self.tracking.get(entity).map(|x| x.1.translation()).ok()
+    }
+
+    /// Obtain the local translation of an external entity, must not contain a [`ProjectileInstance`].
+    ///
+    /// If not present, returns the default value.
+    pub fn local_translation_of(&self, entity: Entity) -> Option<Vec3> {
+        self.tracking.get(entity).map(|x| x.0.translation).ok()
     }
 
     /// If has a parent projectile instance, return its [`Transform`].

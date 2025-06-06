@@ -2,8 +2,6 @@
 //!
 //! https://www.youtube.com/watch?v=dPJQuD93-Ks
 
-use std::sync::OnceLock;
-
 use bevy::{
     core_pipeline::bloom::Bloom,
     math::VectorSpace,
@@ -23,8 +21,6 @@ use bevy_texture_gen::{
 };
 use fastrand::Rng;
 use ramp_gen::ramp;
-
-static SHADER: OnceLock<Handle<Shader>> = OnceLock::new();
 
 fn main() {
     App::new()
@@ -220,7 +216,7 @@ impl Projectile for HomingFireball {
         self.hit.is_activated()
     }
 
-    fn update_projectile(&mut self, cx: &mut ProjectileContext, dt: f32) {
+    fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {
         let Some(transform) = cx.global_transform_of(self.target) else {
             return;
         };
@@ -268,7 +264,7 @@ impl Projectile for Smoke {
         3.
     }
 
-    fn update_projectile(&mut self, cx: &mut ProjectileContext, dt: f32) {
+    fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {
         let fac = cx.fac();
         cx.mat3d::<StandardMaterial>(|m| {
             let ramp = |x: f32| ramp!(clamp [0.2, Srgba::gray(0.8)], [0.4, Srgba::BLACK]);

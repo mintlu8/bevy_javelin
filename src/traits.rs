@@ -9,14 +9,17 @@ use bevy::{
         bundle::Bundle,
         component::Component,
         entity::Entity,
-        hierarchy::Children,
+        hierarchy::{ChildOf, Children},
         world::{EntityMutExcept, Mut},
     },
     render::view::Visibility,
     transform::components::Transform,
 };
 
-use crate::{ProjectileBundle, ProjectileContext, WorldSpaceChildOf, WorldSpaceChildren};
+use crate::{
+    ProjectileBundle, ProjectileContext, WorldSpaceChildOf, WorldSpaceChildren,
+    builder::WithSpawner,
+};
 
 struct DummyProjectile;
 
@@ -38,7 +41,7 @@ pub enum ProjectileSpace {
 ///
 /// # How to implement
 ///
-/// The simplist way to implement this trait is to use [`SpawnRate`](crate::util::SpawnRate).
+/// The simplist way to implement this trait is to use [`SpawnRate`](crate::spawning::SpawnRate).
 /// We call `SpawnRate::update` in `update_spawner` and use `SpawnRate::spawn` in `spawn_projectile`.`
 #[allow(unused_variables)]
 pub trait ProjectileSpawner: Send + Sync + 'static {
@@ -123,11 +126,6 @@ pub trait ProjectileSpawner: Send + Sync + 'static {
         cx.lifetime > self.duration()
     }
 
-    /// Should be used if we want to spawn multiple types of projectiles.
-    fn extension(&mut self) -> Option<&mut impl ProjectileSpawner> {
-        None::<&mut DummyProjectile>
-    }
-
     /// Return a list of [`Entity`] child projectiles, must be [`ProjectileInstance`]s.
     ///
     /// By default, this returns [`Children`] if found, otherwise [`WorldSpaceChildren`], otherwise `[]`,
@@ -137,6 +135,22 @@ pub trait ProjectileSpawner: Send + Sync + 'static {
             .map(|x| x.iter().copied())
             .or_else(|| cx.get::<WorldSpaceChildren>().map(|x| x.into_iter()))
             .unwrap_or([].iter().copied())
+    }
+
+    /// Should be used if we want to spawn multiple types of projectiles.
+    fn extension(&mut self) -> Option<&mut impl ProjectileSpawner> {
+        None::<&mut DummyProjectile>
+    }
+
+    /// Join with a spawner that spawns different projectiles.
+    fn with_extension<T: ProjectileSpawner>(self, extension: T) -> WithSpawner<Self, T>
+    where
+        Self: Sized,
+    {
+        WithSpawner {
+            base: self,
+            spawner: extension,
+        }
     }
 }
 
@@ -158,13 +172,15 @@ pub trait Projectile: Send + Sync + 'static {
 
     /// Returns true if projectile has expired.
     ///
+    /// This always runs after `update`, you can rely on `update` being ran at least once.
+    ///
     /// By default checks `lifetime > duration`.
     fn is_expired(&self, cx: &ProjectileContext) -> bool {
         cx.lifetime > self.duration()
     }
 
     /// Updates the projectile, will not be called if expired.
-    fn update_projectile(&mut self, cx: &mut ProjectileContext, dt: f32) {}
+    fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {}
 
     /// Run once when `is_expired` returns true for the first time.
     ///
@@ -179,6 +195,17 @@ pub trait Projectile: Send + Sync + 'static {
     /// If this projectile spawns child projectiles, add them here.
     fn as_spawner(&mut self) -> Option<&mut impl ProjectileSpawner> {
         None::<&mut DummyProjectile>
+    }
+
+    /// Join with a spawner that spawns child projectiles.
+    fn with_spawner<T: ProjectileSpawner>(self, extension: T) -> WithSpawner<Self, T>
+    where
+        Self: Sized,
+    {
+        WithSpawner {
+            base: self,
+            spawner: extension,
+        }
     }
 }
 
@@ -367,14 +394,15 @@ struct ErasedProjectileInst<T> {
 
 impl<T: Projectile> ErasedProjectile for ErasedProjectileInst<T> {
     fn update(&mut self, mut cx: ProjectileContext, dt: f32) -> bool {
-        if !self.projectile.is_expired(&cx) {
+        if !self.expired {
             cx.fac = self
                 .projectile
                 .fac_curve(cx.lifetime / self.projectile.duration());
-            Projectile::update_projectile(&mut self.projectile, &mut cx, dt);
-        } else if !self.expired {
-            self.expired = true;
-            self.projectile.on_expire(&mut cx);
+            Projectile::update(&mut self.projectile, &mut cx, dt);
+            if self.projectile.is_expired(&cx) {
+                self.expired = true;
+                self.projectile.on_expire(&mut cx);
+            }
         }
         if let Some(spawner) = self.projectile.as_spawner() {
             update_spawner(spawner, &mut cx, dt);
@@ -429,18 +457,18 @@ fn update_spawner<T: ProjectileSpawner>(this: &mut T, cx: &mut ProjectileContext
             let entity = cx.entity();
             match this.space() {
                 ProjectileSpace::Local => {
-                    cx.commands.entity(entity).with_child((
+                    cx.commands.spawn((
+                        ChildOf(entity),
                         ProjectileInstance::new_with_reference(projectile, cx.rc),
                         bundle,
                     ));
                 }
                 ProjectileSpace::World => {
-                    cx.commands
-                        .entity(entity)
-                        .with_related::<WorldSpaceChildOf>((
-                            ProjectileInstance::new_with_reference(projectile, cx.rc),
-                            bundle,
-                        ));
+                    cx.commands.spawn((
+                        WorldSpaceChildOf(entity),
+                        ProjectileInstance::new_with_reference(projectile, cx.rc),
+                        bundle,
+                    ));
                 }
             }
         }

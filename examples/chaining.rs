@@ -1,7 +1,6 @@
 use bevy::{math::VectorSpace, prelude::*};
 use bevy_javelin::{
-    Projectile, ProjectileBundle, ProjectileContext, ProjectileInstance, ProjectilePlugin,
-    ProjectileSpawner,
+    Projectile, ProjectileContext, ProjectileInstance, ProjectilePlugin,
     loading::{AddMat3, AddMesh3},
     spawning::{ProjectileSpawning, SpawnRate},
     util::{PhysicsExt, ProjectileRng},
@@ -39,10 +38,33 @@ fn setup(
         Transform::from_translation(Vec3::new(10., 10., -10.)).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
-    commands.spawn(ProjectileInstance::spawner(MySpawner {
-        rate: SpawnRate::new(4.),
-        rng: Rng::new(),
-    }));
+    commands.spawn(ProjectileInstance::spawner(
+        SpawnRate::new(4.).into_spawner_world(|rng, _| {
+            (
+                MyProjectile {
+                    velocity: (rng.random_circle() * 4.).extend(10.0).xzy(),
+                    rng: rng.fork(),
+                }
+                .with_spawner(SpawnRate::new(12.).into_spawner_world(|_, cx| {
+                    (
+                        MyProjectile3,
+                        Transform::from_translation(cx.global_transform().translation()),
+                        AddMesh3(Mesh::from(Sphere::new(0.1).mesh())),
+                        AddMat3(StandardMaterial {
+                            base_color: Color::srgb(0., 1., 0.),
+                            alpha_mode: AlphaMode::Blend,
+                            ..Default::default()
+                        }),
+                    )
+                })),
+                AddMesh3(Mesh::from(Sphere::new(0.5).mesh())),
+                AddMat3(StandardMaterial {
+                    base_color: Color::srgb(0., 1., 1.),
+                    ..Default::default()
+                }),
+            )
+        }),
+    ));
 
     // ground plane
     commands.spawn((
@@ -52,46 +74,13 @@ fn setup(
     ));
 }
 
-struct MySpawner {
-    rate: SpawnRate,
-    rng: Rng,
-}
-
-impl ProjectileSpawner for MySpawner {
-    fn is_complete(&self, _: &ProjectileContext) -> bool {
-        false
-    }
-
-    fn update(&mut self, _: &mut ProjectileContext, dt: f32) {
-        self.rate.update(dt);
-    }
-
-    fn spawn_projectile(&mut self, _: &ProjectileContext) -> Option<impl ProjectileBundle + use<>> {
-        self.rate.spawn(|| {
-            (
-                MyProjectile {
-                    velocity: (self.rng.random_circle() * 4.).extend(10.0).xzy(),
-                    rng: self.rng.fork(),
-                    spawn_rate: SpawnRate::new(12.),
-                },
-                AddMesh3(Mesh::from(Sphere::new(0.5).mesh())),
-                AddMat3(StandardMaterial {
-                    base_color: Color::srgb(0., 1., 1.),
-                    ..Default::default()
-                }),
-            )
-        })
-    }
-}
-
 struct MyProjectile {
     velocity: Vec3,
     rng: Rng,
-    spawn_rate: SpawnRate,
 }
 
 impl Projectile for MyProjectile {
-    fn update_projectile(&mut self, cx: &mut ProjectileContext, dt: f32) {
+    fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {
         cx.transform_mut().translation.acceleration(
             &mut self.velocity,
             Vec3::new(0., -9.8, 0.),
@@ -126,38 +115,6 @@ impl Projectile for MyProjectile {
         }
         cx.set_invisible();
     }
-
-    fn as_spawner(&mut self) -> Option<&mut impl ProjectileSpawner> {
-        Some(self)
-    }
-}
-
-impl ProjectileSpawner for MyProjectile {
-    fn update(&mut self, _: &mut ProjectileContext, dt: f32) {
-        self.spawn_rate.update(dt);
-    }
-
-    fn spawn_projectile(
-        &mut self,
-        cx: &ProjectileContext,
-    ) -> Option<impl ProjectileBundle + use<>> {
-        self.spawn_rate.spawn(|| {
-            (
-                MyProjectile3,
-                Transform::from_translation(cx.global_transform().translation()),
-                AddMesh3(Mesh::from(Sphere::new(0.1).mesh())),
-                AddMat3(StandardMaterial {
-                    base_color: Color::srgb(0., 1., 0.),
-                    alpha_mode: AlphaMode::Blend,
-                    ..Default::default()
-                }),
-            )
-        })
-    }
-
-    fn is_complete(&self, cx: &ProjectileContext) -> bool {
-        Projectile::is_expired(self, cx)
-    }
 }
 
 struct MyProjectile2 {
@@ -165,7 +122,7 @@ struct MyProjectile2 {
 }
 
 impl Projectile for MyProjectile2 {
-    fn update_projectile(&mut self, cx: &mut ProjectileContext, dt: f32) {
+    fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {
         cx.transform_mut().translation.acceleration(
             &mut self.velocity,
             Vec3::new(0., -9.8, 0.),
@@ -193,7 +150,7 @@ impl Projectile for MyProjectile3 {
         1.
     }
 
-    fn update_projectile(&mut self, cx: &mut ProjectileContext, _: f32) {
+    fn update(&mut self, cx: &mut ProjectileContext, _: f32) {
         let fac = cx.fac();
         cx.mat3d::<StandardMaterial>(|x| {
             x.base_color.set_alpha(1.0 - fac);

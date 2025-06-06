@@ -26,7 +26,7 @@ impl<'t> IntoIterator for &'t WorldSpaceChildren {
 /// Alternative children that does not inherit transform.
 #[derive(Debug, Component)]
 #[relationship(relationship_target = WorldSpaceChildren)]
-pub struct WorldSpaceChildOf(Entity);
+pub struct WorldSpaceChildOf(pub Entity);
 
 impl WorldSpaceChildOf {
     pub fn parent(&self) -> Entity {

@@ -17,6 +17,9 @@ fn lerp(a: f32, b: f32, fac: f32) -> f32 {
 
 /// Extension traits on [`Rng`] to generate random stuff.
 pub trait ProjectileRng {
+    /// Create a random radian in `0..2π`.
+    fn random_radian(&mut self) -> f32;
+
     /// Create a random 2d unit vector.
     fn random_circle(&mut self) -> Vec2;
 
@@ -34,28 +37,35 @@ pub trait ProjectileRng {
 
     /// Create a random [`Quat`].
     fn random_quat(&mut self) -> Quat;
+
+    /// Create a random [`Quat`] facing a direction.
+    fn random_quat_facing(&mut self, direction: Vec3) -> Quat;
 }
 
 impl ProjectileRng for Rng {
+    fn random_radian(&mut self) -> f32 {
+        self.f32() * (2. * PI)
+    }
+
     fn random_circle(&mut self) -> Vec2 {
-        Vec2::from_angle(self.f32() * (2. * PI))
+        Vec2::from_angle(self.random_radian())
     }
 
     fn random_in_circle(&mut self) -> Vec2 {
         let r = self.f32().sqrt();
-        let (s, c) = (self.f32() * 2. * PI).sin_cos();
+        let (s, c) = self.random_radian().sin_cos();
         Vec2::new(r * c, r * s)
     }
 
     fn random_tangent(&mut self, points_to: Vec3) -> Vec3 {
-        let theta = self.f32() * 2. * PI;
+        let theta = self.random_radian();
         let (sin, cos) = theta.sin_cos();
         let v = Vec3::new(sin, cos, 0.);
         Quat::from_rotation_arc(Vec3::Z, points_to).mul_vec3(v)
     }
 
     fn random_cone(&mut self, points_to: Vec3, angle: f32) -> Vec3 {
-        let theta = self.f32() * 2. * PI;
+        let theta = self.random_radian();
         let angle = angle.cos();
         let phi = (lerp(1.0, angle, self.f32())).acos();
         let (ps, pc) = phi.sin_cos();
@@ -64,7 +74,7 @@ impl ProjectileRng for Rng {
     }
 
     fn random_sphere(&mut self) -> Vec3 {
-        let theta = self.f32() * 2. * PI;
+        let theta = self.random_radian();
         let phi = (self.f32() * 2. - 1.).acos();
         let (ps, pc) = phi.sin_cos();
         let (ts, tc) = theta.sin_cos();
@@ -81,6 +91,12 @@ impl ProjectileRng for Rng {
             (u1).sqrt() * (2. * PI * u3).sin(),
             (u1).sqrt() * (2. * PI * u3).cos(),
         ])
+    }
+
+    fn random_quat_facing(&mut self, facing: Vec3) -> Quat {
+        Quat::from_rotation_arc(Vec3::NEG_Z, facing.normalize())
+            .mul_quat(Quat::from_axis_angle(facing, self.random_radian()))
+            .normalize()
     }
 }
 
@@ -210,6 +226,47 @@ impl ConditionOnce {
         if !self.0 {
             self.0 = condition()
         }
+        self.0
+    }
+}
+
+/// A simple counter.
+#[derive(Debug, Default)]
+pub struct Counter(pub usize);
+
+impl Counter {
+    pub const ZERO: Counter = Counter(0);
+
+    /// Obtain the next value and increment the counter.
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> usize {
+        let result = self.0;
+        self.0 += 1;
+        result
+    }
+}
+
+/// A dynamic value getter that retains its previous value
+/// if the value source is removed.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RetainedValue<T>(pub T);
+
+impl<T: Copy> RetainedValue<T> {
+    pub fn get(&mut self, new: Option<T>) -> T {
+        if let Some(value) = new {
+            self.0 = value
+        }
+        self.0
+    }
+
+    pub fn get_with(&mut self, new: impl FnOnce() -> Option<T>) -> T {
+        if let Some(value) = new() {
+            self.0 = value
+        }
+        self.0
+    }
+
+    pub fn current(&self) -> T {
         self.0
     }
 }

@@ -65,7 +65,7 @@ struct MyProjectile {
 }
 
 impl Projectile for MyProjectile {
-    fn update_projectile(&mut self, cx: &mut ProjectileContext, dt: f32) {
+    fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {
         cx.transform_mut().translation.acceleration(
             &mut self.velocity,
             Vec3::new(0., -9.8, 0.),
