@@ -8,12 +8,13 @@ use bevy::{
     math::Vec2,
     sprite::Sprite,
 };
+use bevy_asset_util::{AssetCacheLayer, CachedAssetServer};
 use bevy_rectray::{
     Dimension, RectrayFrame, RectrayPlugin, RectrayWindow, SyncDimension, Transform2D,
     layout::{Container, LayoutObject, ParagraphLayout},
 };
 use bevy_texture_gen::{
-    FbmNoiseImage, ImageBuilder, LazyImage, LoadLazyImageExt, PerlinImage, VoronoiImage, lazy_image,
+    FbmNoiseImage, ImageBuilder, LazyImage, PerlinImage, VoronoiImage, lazy_image,
 };
 use noise::Perlin;
 
@@ -21,14 +22,7 @@ pub fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(RectrayPlugin)
-        .load_lazy_image(&PERLIN)
-        .load_lazy_image(&WIDE)
-        .load_lazy_image(&TALL)
-        .load_lazy_image(&FBM)
-        .load_lazy_image(&VORONOI)
-        .load_lazy_image(&VORONOI3D)
-        .load_lazy_image(&DISTORT_VORONOI)
-        .load_lazy_image(&VORONOI_DISSOLVE)
+        .init_resource::<AssetCacheLayer>()
         .add_systems(Startup, init)
         .run();
 }
@@ -56,7 +50,7 @@ static VORONOI_DISSOLVE: LazyImage = lazy_image!(
     VoronoiImage::new3d(5).map_value(|_, x| x.powf(3.))
 );
 
-pub fn init(mut commands: Commands) {
+pub fn init(mut commands: Commands, mut assets: CachedAssetServer) {
     commands.spawn(Camera2d);
     let root = commands
         .spawn((RectrayFrame::default(), RectrayWindow))
@@ -88,12 +82,12 @@ pub fn init(mut commands: Commands) {
         ));
     };
 
-    spawn(PERLIN.get());
-    spawn(WIDE.get());
-    spawn(TALL.get());
-    spawn(FBM.get());
-    spawn(VORONOI.get());
-    spawn(VORONOI3D.get());
-    spawn(DISTORT_VORONOI.get());
-    spawn(VORONOI_DISSOLVE.get());
+    spawn(PERLIN.get(&mut assets));
+    spawn(WIDE.get(&mut assets));
+    spawn(TALL.get(&mut assets));
+    spawn(FBM.get(&mut assets));
+    spawn(VORONOI.get(&mut assets));
+    spawn(VORONOI3D.get(&mut assets));
+    spawn(DISTORT_VORONOI.get(&mut assets));
+    spawn(VORONOI_DISSOLVE.get(&mut assets));
 }

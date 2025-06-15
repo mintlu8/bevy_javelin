@@ -38,7 +38,7 @@ impl<A: Projectile, T: ProjectileSpawner> Projectile for WithSpawner<A, T> {
 impl<A: ProjectileSpawner, T: ProjectileSpawner> ProjectileSpawner for WithSpawner<A, T> {
     fn spawn_projectile(
         &mut self,
-        cx: &crate::ProjectileContext,
+        cx: &mut crate::ProjectileContext,
     ) -> Option<impl crate::ProjectileBundle + use<A, T>> {
         self.base.spawn_projectile(cx)
     }

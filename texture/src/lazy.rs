@@ -1,11 +1,4 @@
-use std::sync::OnceLock;
-
-use bevy::{
-    app::App,
-    asset::{Assets, DirectAssetAccessExt, Handle},
-    ecs::world::World,
-    image::Image,
-};
+use bevy::image::Image;
 use bevy_asset_util::LazyAssetCell;
 
 pub type LazyImage = LazyAssetCell<Image>;
@@ -63,47 +56,4 @@ macro_rules! lazy_image {
             image
         })
     };
-}
-
-impl LazyImage {
-    pub const fn new(f: fn() -> Image) -> LazyImage {
-        LazyImage {
-            get: f,
-            cell: OnceLock::new(),
-        }
-    }
-
-    pub fn load(&self, world: &mut World) {
-        let _ = self.cell.get_or_init(|| world.add_asset((self.get)()));
-    }
-
-    pub fn get_or_load(&self, assets: &mut Assets<Image>) -> &Handle<Image> {
-        self.cell.get_or_init(|| assets.add((self.get)()))
-    }
-
-    /// # Panics
-    ///
-    /// If not initialized.
-    pub fn get(&self) -> Handle<Image> {
-        self.cell.get().unwrap().clone()
-    }
-}
-
-/// Extension for loading lazy image.
-pub trait LoadLazyImageExt {
-    fn load_lazy_image(&mut self, image: &LazyImage) -> &mut Self;
-}
-
-impl LoadLazyImageExt for World {
-    fn load_lazy_image(&mut self, image: &LazyImage) -> &mut Self {
-        image.load(self);
-        self
-    }
-}
-
-impl LoadLazyImageExt for App {
-    fn load_lazy_image(&mut self, image: &LazyImage) -> &mut Self {
-        image.load(self.world_mut());
-        self
-    }
 }

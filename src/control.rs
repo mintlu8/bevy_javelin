@@ -1,5 +1,5 @@
 use bevy::{
-    asset::{Asset, AssetId, Assets},
+    asset::{Asset, AssetId, Assets, Handle},
     ecs::{
         bundle::Bundle,
         change_detection::DetectChanges,
@@ -20,6 +20,7 @@ use bevy::{
     sprite::{Material2d, MeshMaterial2d},
     transform::components::{GlobalTransform, Transform},
 };
+use bevy_asset_util::AsAssetsMut;
 
 use crate::{
     DefaultProjectileBundle, DetachToWorldSpaceExt, ProjectileBundle, ProjectileInstance,
@@ -425,5 +426,11 @@ impl ProjectileContext<'_, '_> {
             let commands = self.commands.entity(entity);
             f(projectile, transform, global, entity_mut, commands);
         }
+    }
+}
+
+impl<T: Asset> AsAssetsMut<T> for ProjectileContext<'_, '_> {
+    fn add(&mut self, value: T) -> Handle<T> {
+        self.resources.add(value)
     }
 }

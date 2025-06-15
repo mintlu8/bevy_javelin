@@ -75,7 +75,7 @@ pub trait ProjectileSpawner: Send + Sync + 'static {
     /// add or load assets directly.
     fn spawn_projectile(
         &mut self,
-        cx: &ProjectileContext,
+        cx: &mut ProjectileContext,
     ) -> Option<impl ProjectileBundle + use<Self>> {
         None::<DummyProjectile>
     }

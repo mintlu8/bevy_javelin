@@ -16,9 +16,7 @@ use bevy_javelin::{
     spawning::{ProjectileSpawning, SpawnRate},
     util::{ConditionOnce, PhysicsExt, ProjectileRng},
 };
-use bevy_texture_gen::{
-    FbmPerlinImage, ImageBuilder, LazyImage, LoadLazyImageExt, VoronoiImage, lazy_image,
-};
+use bevy_texture_gen::{FbmPerlinImage, ImageBuilder, LazyImage, VoronoiImage, lazy_image};
 use fastrand::Rng;
 use ramp_gen::ramp;
 
@@ -35,9 +33,6 @@ fn main() {
         .add_plugins(MaterialPlugin::<
             ExtendedMaterial<StandardMaterial, FireBallMaterial>,
         >::default())
-        .load_lazy_image(&FIREBALL_TEX)
-        .load_lazy_image(&FIREBALL_NOISE)
-        .load_lazy_image(&NOISE_TEX)
         .run();
 }
 
@@ -172,7 +167,7 @@ struct FireballSpawner {
 impl ProjectileSpawner for FireballSpawner {
     fn spawn_projectile(
         &mut self,
-        cx: &ProjectileContext,
+        cx: &mut ProjectileContext,
     ) -> Option<impl ProjectileBundle + use<>> {
         self.rate.spawn(|| {
             (
@@ -190,8 +185,8 @@ impl ProjectileSpawner for FireballSpawner {
                         ..Default::default()
                     },
                     extension: FireBallMaterial {
-                        voronoi: FIREBALL_TEX.get(),
-                        noise: FIREBALL_NOISE.get(),
+                        voronoi: FIREBALL_TEX.get(cx),
+                        noise: FIREBALL_NOISE.get(cx),
                     },
                 }),
                 *cx.transform(),
@@ -235,7 +230,7 @@ impl Projectile for HomingFireball {
 impl ProjectileSpawner for HomingFireball {
     fn spawn_projectile(
         &mut self,
-        cx: &ProjectileContext,
+        cx: &mut ProjectileContext,
     ) -> Option<impl ProjectileBundle + use<>> {
         self.smoke_spawning.spawn(|| {
             (
@@ -243,7 +238,7 @@ impl ProjectileSpawner for HomingFireball {
                 LoadMesh3("smoke.glb#Mesh0/Primitive0"),
                 AddMat3(StandardMaterial {
                     base_color: Srgba::gray(0.8).into(),
-                    base_color_texture: Some(NOISE_TEX.get()),
+                    base_color_texture: Some(NOISE_TEX.get(cx)),
                     alpha_mode: AlphaMode::Mask(0.3),
                     ..Default::default()
                 }),

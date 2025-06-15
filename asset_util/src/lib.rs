@@ -3,12 +3,13 @@ mod tuple;
 pub use as_asset::AsAssetsMut;
 pub use tuple::AssetTuple;
 
-use std::{sync::{Arc, Mutex, Weak}};
+use std::sync::{Arc, Mutex, Weak};
 
 use bevy::{
     asset::{Asset, AssetPath, AssetServer, Handle, StrongHandle, UntypedHandle},
     ecs::{
-        resource::Resource, system::{Res, ResMut, StaticSystemParam, SystemParam}
+        resource::Resource,
+        system::{Res, ResMut, StaticSystemParam, SystemParam},
     },
     prelude::{Deref, DerefMut},
 };
@@ -73,9 +74,9 @@ pub struct LazyAssetCell<T: Asset> {
 
 impl<T: Asset> LazyAssetCell<T> {
     pub const fn new(f: fn() -> T) -> Self {
-        LazyAssetCell { 
-            mutex: Mutex::new(None), 
-            create: f
+        LazyAssetCell {
+            mutex: Mutex::new(None),
+            create: f,
         }
     }
 

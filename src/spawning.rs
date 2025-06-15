@@ -243,7 +243,7 @@ where
 {
     fn spawn_projectile(
         &mut self,
-        cx: &crate::ProjectileContext,
+        cx: &mut crate::ProjectileContext,
     ) -> Option<impl ProjectileBundle + use<T, F, U>> {
         self.spawning.spawn(|| (self.spawn_fn)(&mut self.rng, cx))
     }
