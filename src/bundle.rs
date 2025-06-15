@@ -1,11 +1,12 @@
 use crate::Projectile;
-use bevy::ecs::{bundle::Bundle, world::FilteredResourcesMut};
+use bevy::ecs::{bundle::Bundle, system::Commands, world::FilteredResourcesMut};
 
 /// A tuple starting with a [`Projectile`], with up to 15 [`Bundle`]s or [`BundleOrAsset`] implementors.
 pub trait ProjectileBundle {
     fn into_projectile_bundle(
         self,
         resources: &mut FilteredResourcesMut,
+        commands: &mut Commands,
     ) -> (impl Projectile, impl Bundle);
 }
 
@@ -15,7 +16,7 @@ macro_rules! impl_bun {
     ($u: ident $(, $t: ident)*) => {
         #[allow(non_snake_case, unused)]
         impl<$u: Projectile $(, $t: BundleOrAsset)*> ProjectileBundle for ($u, $($t),*) {
-            fn into_projectile_bundle(self, resources: &mut FilteredResourcesMut) -> (impl Projectile, impl Bundle) {
+            fn into_projectile_bundle(self, resources: &mut FilteredResourcesMut, _: &mut Commands,) -> (impl Projectile, impl Bundle) {
                 let ($u, $(mut $t),*) = self;
                 $(let $t = $t.to_bundle(resources);)*
                 ($u, ($($t),*))
@@ -30,6 +31,7 @@ impl<T: Projectile> ProjectileBundle for T {
     fn into_projectile_bundle(
         self,
         _: &mut FilteredResourcesMut,
+        _: &mut Commands,
     ) -> (impl Projectile, impl Bundle) {
         (self, ())
     }

@@ -6,13 +6,9 @@ use bevy::{
     ecs::world::World,
     image::Image,
 };
+use bevy_asset_util::LazyAssetCell;
 
-/// A static compatible lazily initialized image.
-#[derive(Debug)]
-pub struct LazyImage {
-    get: fn() -> Image,
-    cell: OnceLock<Handle<Image>>,
-}
+pub type LazyImage = LazyAssetCell<Image>;
 
 /// Create a static compatible lazily initialized image.
 ///

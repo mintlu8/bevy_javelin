@@ -308,7 +308,8 @@ impl ProjectileContext<'_, '_> {
     /// Spawn a child projectile in world space.
     pub fn spawn_world_space(&mut self, bundle: impl ProjectileBundle) {
         let entity = self.entity();
-        let (projectile, bundle) = bundle.into_projectile_bundle(&mut self.resources);
+        let (projectile, bundle) =
+            bundle.into_projectile_bundle(&mut self.resources, &mut self.commands);
         self.commands
             .entity(entity)
             .with_related::<WorldSpaceChildOf>((
@@ -320,7 +321,8 @@ impl ProjectileContext<'_, '_> {
     /// Spawn a child projectile in local space.
     pub fn spawn_local_space(&mut self, bundle: impl ProjectileBundle) {
         let entity = self.entity();
-        let (projectile, bundle) = bundle.into_projectile_bundle(&mut self.resources);
+        let (projectile, bundle) =
+            bundle.into_projectile_bundle(&mut self.resources, &mut self.commands);
         self.commands.entity(entity).with_child((
             ProjectileInstance::new_with_reference(projectile, self.rc),
             bundle,
@@ -329,7 +331,8 @@ impl ProjectileContext<'_, '_> {
 
     /// Spawn a unrelated projectile in the world.
     pub fn spawn_disjoint(&mut self, bundle: impl ProjectileBundle) {
-        let (projectile, bundle) = bundle.into_projectile_bundle(&mut self.resources);
+        let (projectile, bundle) =
+            bundle.into_projectile_bundle(&mut self.resources, &mut self.commands);
         self.commands
             .spawn((ProjectileInstance::new(projectile), bundle));
     }

@@ -182,6 +182,9 @@ pub trait Projectile: Send + Sync + 'static {
     /// Updates the projectile, will not be called if expired.
     fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {}
 
+    /// Run once when projectile is created.
+    fn on_create(&mut self, cx: &mut ProjectileContext) {}
+
     /// Run once when `is_expired` returns true for the first time.
     ///
     /// By default this despawns the entity, if this is not desired, overwrite this behavior.
@@ -283,6 +286,7 @@ impl ProjectileInstance {
             projectile: Box::new(ErasedProjectileInst {
                 projectile,
                 expired: false,
+                once: false,
             }),
             lifetime: 0.0,
             rc: ProjectileRc::new(),
@@ -299,6 +303,7 @@ impl ProjectileInstance {
             projectile: Box::new(ErasedProjectileInst {
                 projectile,
                 expired: false,
+                once: false,
             }),
             lifetime: 0.0,
             rc: reference.clone(),
@@ -389,6 +394,7 @@ impl<T: ProjectileSpawner> ErasedProjectile for ErasedSpawner<T> {
 
 struct ErasedProjectileInst<T> {
     projectile: T,
+    once: bool,
     expired: bool,
 }
 
@@ -398,6 +404,10 @@ impl<T: Projectile> ErasedProjectile for ErasedProjectileInst<T> {
             cx.fac = self
                 .projectile
                 .fac_curve(cx.lifetime / self.projectile.duration());
+            if !self.once {
+                self.once = true;
+                self.projectile.on_create(&mut cx);
+            }
             Projectile::update(&mut self.projectile, &mut cx, dt);
             if self.projectile.is_expired(&cx) {
                 self.expired = true;
@@ -453,7 +463,8 @@ fn update_spawner<T: ProjectileSpawner>(this: &mut T, cx: &mut ProjectileContext
     if !this.is_complete(cx) {
         ProjectileSpawner::update(this, cx, dt);
         while let Some(projectile) = this.spawn_projectile(cx) {
-            let (projectile, bundle) = projectile.into_projectile_bundle(&mut cx.resources);
+            let (projectile, bundle) =
+                projectile.into_projectile_bundle(&mut cx.resources, &mut cx.commands);
             let entity = cx.entity();
             match this.space() {
                 ProjectileSpace::Local => {
