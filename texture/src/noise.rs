@@ -1,59 +1,92 @@
-use crate::ImageBuilder;
-use bevy::math::Vec2;
-use noise::{Fbm, MultiFractal, NoiseFn, Perlin, Seedable, Simplex, SuperSimplex};
+use crate::{ImageBuilder, IntoImageBuilder};
+use bevy::math::{Vec2, Vec3};
+use noiz::{
+    Noise, NoiseFunction, SampleableFor,
+    cells::OrthoGrid,
+    curves::Smoothstep,
+    prelude::{
+        FractalLayers, LayeredNoise, MixCellGradients, Normed, Octave, Persistence, QuickGradients,
+        SNormToUNorm,
+    },
+    rng::NoiseRng,
+};
 
-/// Represents simple seeded noises like `Perlin` and `Simplex`.
-pub trait SimpleNoise: NoiseFn<f64, 2> + Seedable + Default {}
+pub struct NoiseImage<T>(pub Noise<T>);
 
-impl<T> SimpleNoise for T where T: NoiseFn<f64, 2> + Seedable + Default {}
-
-#[derive(Debug)]
-pub struct NoiseImage<T: NoiseFn<f64, 2>>(pub T);
-
-pub type PerlinImage = NoiseImage<Perlin>;
-pub type SimpleXImage = NoiseImage<Simplex>;
-pub type SuperSimpleXImage = NoiseImage<SuperSimplex>;
-
-impl<T: SimpleNoise> NoiseImage<T> {
-    pub fn new() -> Self {
-        Self(T::default())
+impl<T: NoiseFunction<Vec2, Output: Into<f32> + NoiseFunction<Vec2, Output: Into<f32>>>>
+    NoiseImage<T>
+{
+    /// Change the noise to 3d, might affect how the noise gets sampled.
+    pub fn into_3d(self) -> NoiseImage3d<T> {
+        NoiseImage3d(self.0, 0.)
     }
 
-    pub fn new_seeded(seed: u32) -> Self {
-        Self(T::default().set_seed(seed))
+    /// Change the noise to 3d, might affect how the noise gets sampled.
+    pub fn into_3d_with_z(self, z: f32) -> NoiseImage3d<T> {
+        NoiseImage3d(self.0, z)
     }
 }
 
-impl<T: SimpleNoise> ImageBuilder for NoiseImage<T> {
+impl<T: NoiseFunction<Vec2, Output: Into<f32>>> ImageBuilder for NoiseImage<T> {
     fn sample(&self, position: Vec2) -> f32 {
-        let position = position * 5.;
-        self.0.get(position.as_dvec2().to_array()) as f32 * 0.5 + 0.5
+        self.0.sample(position)
     }
 }
 
-pub struct FbmNoiseImage<T: SimpleNoise>(pub Fbm<T>);
+pub struct NoiseImage3d<T>(Noise<T>, f32);
 
-pub type FbmPerlinImage = FbmNoiseImage<Perlin>;
-pub type FbmSimpleXImage = FbmNoiseImage<Simplex>;
-pub type FbmSuperSimpleXImage = FbmNoiseImage<SuperSimplex>;
-
-impl<T: SimpleNoise> FbmNoiseImage<T> {
-    pub fn new() -> Self {
-        FbmNoiseImage(Fbm::new(0).set_frequency(5.))
-    }
-
-    pub fn new_seeded(seed: u32) -> Self {
-        FbmNoiseImage(Fbm::new(seed).set_frequency(5.))
-    }
-
-    pub fn with_parameters(mut self, f: impl FnOnce(&mut Fbm<T>)) -> Self {
-        f(&mut self.0);
-        self
-    }
-}
-
-impl<T: SimpleNoise> ImageBuilder for FbmNoiseImage<T> {
+impl<T: NoiseFunction<Vec3, Output: Into<f32>>> ImageBuilder for NoiseImage3d<T> {
     fn sample(&self, position: Vec2) -> f32 {
-        self.0.get(position.as_dvec2().to_array()) as f32 * 0.5 + 0.5
+        self.0.sample(position.extend(self.1))
+    }
+}
+
+/// The default blender noise node.
+pub struct FbmNoiseImage {
+    pub size: u32,
+    pub details: u32,
+    pub roughness: f32,
+    pub lacunarity: f32,
+    pub seed: u32,
+}
+
+impl Default for FbmNoiseImage {
+    fn default() -> Self {
+        Self {
+            size: 5,
+            details: 2,
+            roughness: 0.5,
+            lacunarity: 2.,
+            seed: 1,
+        }
+    }
+}
+
+impl IntoImageBuilder for FbmNoiseImage {
+    fn into_image_builder(self) -> impl ImageBuilder {
+        NoiseImage(Noise {
+            noise: (
+                LayeredNoise::new(
+                    Normed::<f32>::default(),
+                    Persistence(self.roughness),
+                    FractalLayers {
+                        layer: Octave(MixCellGradients::<
+                            OrthoGrid<i32>,
+                            Smoothstep,
+                            QuickGradients,
+                        > {
+                            cells: OrthoGrid(self.size as i32),
+                            gradients: QuickGradients,
+                            curve: Smoothstep,
+                        }),
+                        lacunarity: self.lacunarity,
+                        amount: self.details.max(1),
+                    },
+                ),
+                SNormToUNorm,
+            ),
+            seed: NoiseRng(self.seed),
+            frequency: self.size as f32,
+        })
     }
 }

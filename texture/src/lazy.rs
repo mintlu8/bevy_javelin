@@ -30,7 +30,7 @@ pub type LazyImage = LazyAssetCell<Image>;
 #[macro_export]
 macro_rules! lazy_image {
     ($width: expr, $height: expr, $builder: expr $(,)?) => {
-        $crate::LazyImage::new(|| $crate::ImageBuilder::to_image(&$builder, $width, $height))
+        $crate::LazyImage::new(|| $crate::IntoImageBuilder::into_image($builder, $width, $height))
     };
     ($width: expr, $height: expr, $builder: expr, $address_mode: expr $(,)?) => {
         $crate::LazyImage::new(|| {
@@ -46,7 +46,7 @@ macro_rules! lazy_image {
     };
     ($width: expr, $height: expr, $builder: expr, $address_mode_u: expr, $address_mode_v: expr $(,)?) => {
         $crate::LazyImage::new(|| {
-            let mut image = $crate::ImageBuilder::to_image(&$builder, $width, $height);
+            let mut image = $crate::IntoImageBuilder::into_image($builder, $width, $height);
             {
                 use $crate::ImageAddressMode::*;
                 let descriptor = image.sampler.get_or_init_descriptor();

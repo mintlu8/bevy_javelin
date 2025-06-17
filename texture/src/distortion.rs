@@ -1,4 +1,4 @@
-use crate::{FbmNoiseImage, ImageBuilder, PureColorSampler, SimpleNoise};
+use crate::ImageBuilder;
 use bevy::math::{Vec2, Vec4, Vec4Swizzles};
 
 pub struct DistortionImage<A, B> {
@@ -22,24 +22,24 @@ impl<A: ImageBuilder, B: ImageBuilder> ImageBuilder for DistortionImage<A, B> {
 
 pub struct JoinXY<X, Y>(pub X, pub Y);
 
-impl JoinXY<PureColorSampler, PureColorSampler> {
-    pub fn noise<T: SimpleNoise>() -> JoinXY<FbmNoiseImage<T>, FbmNoiseImage<T>> {
-        JoinXY(
-            FbmNoiseImage::new_seeded(41),
-            FbmNoiseImage::new_seeded(7901),
-        )
-    }
+// impl JoinXY<PureColorSampler, PureColorSampler> {
+//     pub fn noise<T: SimpleNoise>() -> JoinXY<FbmNoiseImage<T>, FbmNoiseImage<T>> {
+//         JoinXY(
+//             FbmNoiseImage::new_seeded(41),
+//             FbmNoiseImage::new_seeded(7901),
+//         )
+//     }
 
-    pub fn noise_seeded<T: SimpleNoise>(
-        seed_x: u32,
-        seed_y: u32,
-    ) -> JoinXY<FbmNoiseImage<T>, FbmNoiseImage<T>> {
-        JoinXY(
-            FbmNoiseImage::new_seeded(seed_x),
-            FbmNoiseImage::new_seeded(seed_y),
-        )
-    }
-}
+//     pub fn noise_seeded<T: SimpleNoise>(
+//         seed_x: u32,
+//         seed_y: u32,
+//     ) -> JoinXY<FbmNoiseImage<T>, FbmNoiseImage<T>> {
+//         JoinXY(
+//             FbmNoiseImage::new_seeded(seed_x),
+//             FbmNoiseImage::new_seeded(seed_y),
+//         )
+//     }
+// }
 
 impl<X: ImageBuilder, Y: ImageBuilder> ImageBuilder for JoinXY<X, Y> {
     fn sample(&self, position: Vec2) -> f32 {

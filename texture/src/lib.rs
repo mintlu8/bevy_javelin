@@ -5,7 +5,10 @@ mod lazy;
 mod noise;
 mod util;
 mod voronoi;
-pub use ::noise as noise_rs;
+mod wave;
+
+pub use noiz;
+
 use bevy::{
     asset::RenderAssetUsages,
     image::Image,
@@ -16,11 +19,12 @@ pub use distortion::*;
 pub use lazy::*;
 pub use noise::*;
 pub use voronoi::*;
+pub use wave::*;
 
 #[doc(hidden)]
 pub use bevy::image::ImageAddressMode;
 
-pub trait ImageBuilder: Sized {
+pub trait ImageBuilder {
     /// Sample a single value at a point.
     ///
     /// Normally in `0..1` regardless of dimension, but must support all ranges
@@ -35,73 +39,6 @@ pub trait ImageBuilder: Sized {
     fn sample_color(&self, position: Vec2) -> Vec4 {
         let x = self.sample(position);
         Vec4::new(x, x, x, 1.)
-    }
-
-    /// Multiplies two nodes.
-    fn mix(self, node: impl ImageBuilder) -> impl ImageBuilder {
-        ImageMultiply(self, node)
-    }
-
-    /// Maps sampled grayscale value into a grayscale image.
-    fn map_value(self, f: impl Fn(Vec2, f32) -> f32) -> impl ImageBuilder {
-        NoiseMappedSampler {
-            base: self,
-            function: f,
-        }
-    }
-
-    /// Map colors while maintaining the alpha value.
-    fn map_rgb(self, f: impl Fn(Vec2, Vec3) -> Vec3) -> impl ImageBuilder {
-        ColorMappedSampler {
-            base: self,
-            function: move |pos, vec| f(pos, vec.xyz()).extend(vec.w),
-        }
-    }
-
-    /// Map colors.
-    fn map_color(self, f: impl Fn(Vec2, Vec4) -> Vec4) -> impl ImageBuilder {
-        ColorMappedSampler {
-            base: self,
-            function: f,
-        }
-    }
-
-    /// Turn a grayscale image into a white image with an alpha channel.
-    fn alpha_white(self) -> impl ImageBuilder {
-        ColorMappedSampler {
-            base: self,
-            function: |_, x| Vec4::new(1., 1., 1., x.x),
-        }
-    }
-
-    /// Multiplies the effective signed value of a noise.
-    ///
-    /// # Note
-    ///
-    /// This treats `0.5` as the effective `0`.
-    fn amplify(self, value: f32) -> impl ImageBuilder {
-        NoiseAmplify {
-            noise: self,
-            fac: value,
-        }
-    }
-
-    /// Divides the sampled position by scale.
-    fn zoom_in(self, scale: Vec2) -> impl ImageBuilder {
-        ScaledInput::new(self, Vec2::ONE / scale)
-    }
-
-    /// Multiplies the sampled position by scale.
-    fn zoom_out(self, scale: Vec2) -> impl ImageBuilder {
-        ScaledInput::new(self, scale)
-    }
-
-    /// Distort the image with noises.
-    fn distort(self, x: impl ImageBuilder, y: impl ImageBuilder) -> impl ImageBuilder {
-        DistortionImage {
-            base: self,
-            distortion: JoinXY(x, y),
-        }
     }
 
     /// Convert the builder to an image, with size.
@@ -132,6 +69,93 @@ pub trait ImageBuilder: Sized {
             TextureFormat::Rgba8Unorm,
             RenderAssetUsages::all(),
         )
+    }
+}
+
+impl<T> IntoImageBuilder for T
+where
+    T: ImageBuilder,
+{
+    fn into_image_builder(self) -> impl ImageBuilder {
+        self
+    }
+}
+
+pub trait IntoImageBuilder: Sized {
+    /// Convert to an image builder
+    fn into_image_builder(self) -> impl ImageBuilder;
+
+    /// Multiplies two nodes.
+    fn mix(self, node: impl IntoImageBuilder) -> impl ImageBuilder {
+        ImageMultiply(self.into_image_builder(), node.into_image_builder())
+    }
+
+    /// Maps sampled grayscale value into a grayscale image.
+    fn map_value(self, f: impl Fn(Vec2, f32) -> f32) -> impl ImageBuilder {
+        NoiseMappedSampler {
+            base: self.into_image_builder(),
+            function: f,
+        }
+    }
+
+    /// Map colors while maintaining the alpha value.
+    fn map_rgb(self, f: impl Fn(Vec2, Vec3) -> Vec3) -> impl ImageBuilder {
+        ColorMappedSampler {
+            base: self.into_image_builder(),
+            function: move |pos, vec| f(pos, vec.xyz()).extend(vec.w),
+        }
+    }
+
+    /// Map colors.
+    fn map_color(self, f: impl Fn(Vec2, Vec4) -> Vec4) -> impl ImageBuilder {
+        ColorMappedSampler {
+            base: self.into_image_builder(),
+            function: f,
+        }
+    }
+
+    /// Turn a grayscale image into a white image with an alpha channel.
+    fn alpha_white(self) -> impl ImageBuilder {
+        ColorMappedSampler {
+            base: self.into_image_builder(),
+            function: |_, x| Vec4::new(1., 1., 1., x.x),
+        }
+    }
+
+    /// Multiplies the effective signed value of a noise.
+    ///
+    /// # Note
+    ///
+    /// This treats `0.5` as the effective `0`.
+    fn amplify(self, value: f32) -> impl ImageBuilder {
+        NoiseAmplify {
+            noise: self.into_image_builder(),
+            fac: value,
+        }
+    }
+
+    /// Divides the sampled position by scale.
+    fn zoom_in(self, scale: Vec2) -> impl ImageBuilder {
+        ScaledInput::new(self.into_image_builder(), Vec2::ONE / scale)
+    }
+
+    /// Multiplies the sampled position by scale.
+    fn zoom_out(self, scale: Vec2) -> impl ImageBuilder {
+        ScaledInput::new(self.into_image_builder(), scale)
+    }
+
+    /// Distort the image with noises.
+    fn distort(self, x: impl ImageBuilder, y: impl ImageBuilder) -> impl ImageBuilder {
+        DistortionImage {
+            base: self.into_image_builder(),
+            distortion: JoinXY(x, y),
+        }
+    }
+
+    /// Convert the builder into an image, with size.
+    fn into_image(self, width: usize, height: usize) -> Image {
+        let builder = self.into_image_builder();
+        builder.to_image(width, height)
     }
 }
 pub struct PureColorSampler(pub Vec4);
@@ -170,7 +194,7 @@ impl<F: Fn(Vec2) -> Vec4> ImageBuilder for FunctionSampler<F> {
     }
 }
 
-struct ColorMappedSampler<B: ImageBuilder, F: Fn(Vec2, Vec4) -> Vec4> {
+struct ColorMappedSampler<B: IntoImageBuilder, F: Fn(Vec2, Vec4) -> Vec4> {
     base: B,
     function: F,
 }
@@ -196,7 +220,7 @@ impl<B: ImageBuilder, F: Fn(Vec2, f32) -> f32> ImageBuilder for NoiseMappedSampl
     }
 }
 
-struct SampleToColorSampler<B: ImageBuilder, F: Fn(Vec2, f32) -> Vec4> {
+struct SampleToColorSampler<B: IntoImageBuilder, F: Fn(Vec2, f32) -> Vec4> {
     base: B,
     function: F,
 }

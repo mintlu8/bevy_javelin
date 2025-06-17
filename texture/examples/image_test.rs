@@ -1,10 +1,17 @@
 use bevy::{
     DefaultPlugins,
-    app::{App, Startup},
+    app::{App, Startup, Update},
     asset::Handle,
     core_pipeline::core_2d::Camera2d,
-    ecs::{hierarchy::ChildOf, system::Commands},
+    ecs::{
+        hierarchy::ChildOf,
+        system::{Commands, Query, ResMut},
+    },
     image::Image,
+    input::{
+        ButtonInput,
+        keyboard::KeyCode,
+    },
     math::Vec2,
     sprite::Sprite,
 };
@@ -14,9 +21,9 @@ use bevy_rectray::{
     layout::{Container, LayoutObject, ParagraphLayout},
 };
 use bevy_texture_gen::{
-    FbmNoiseImage, ImageBuilder, LazyImage, PerlinImage, VoronoiImage, lazy_image,
+    FbmNoiseImage, IntoImageBuilder, LazyImage, VoronoiImage, WaveAngle, WaveImage, lazy_image,
 };
-use noise::Perlin;
+use noiz::lengths::MinkowskiLength;
 
 pub fn main() {
     App::new()
@@ -24,30 +31,54 @@ pub fn main() {
         .add_plugins(RectrayPlugin)
         .init_resource::<AssetCacheLayer>()
         .add_systems(Startup, init)
+        .add_systems(Update, margin)
         .run();
 }
 
-static PERLIN: LazyImage = lazy_image!(512, 512, PerlinImage::new());
-static WIDE: LazyImage = lazy_image!(1024, 512, PerlinImage::new());
-static TALL: LazyImage = lazy_image!(512, 1024, PerlinImage::new());
-static FBM: LazyImage = lazy_image!(512, 512, FbmNoiseImage::<Perlin>::new());
-
-static VORONOI: LazyImage = lazy_image!(512, 512, VoronoiImage::new(5));
-static VORONOI3D: LazyImage = lazy_image!(512, 512, VoronoiImage::new3d_seeded(5, 88));
-
-static DISTORT_VORONOI: LazyImage = lazy_image!(
+static BASE: LazyImage = lazy_image!(512, 512, FbmNoiseImage::default());
+static WIDE: LazyImage = lazy_image!(1024, 512, FbmNoiseImage::default());
+static TALL: LazyImage = lazy_image!(512, 1024, FbmNoiseImage::default());
+static FBM: LazyImage = lazy_image!(
     512,
     512,
-    VoronoiImage::new(4).distort(
-        FbmNoiseImage::<Perlin>::new_seeded(0).amplify(0.1),
-        FbmNoiseImage::<Perlin>::new_seeded(1).amplify(0.1),
-    )
+    FbmNoiseImage {
+        size: 2,
+        ..Default::default()
+    }
 );
 
-static VORONOI_DISSOLVE: LazyImage = lazy_image!(
+/// Test this in fact tiles.
+static VORONOI: LazyImage = lazy_image!(512, 512, VoronoiImage::new(5));
+static VORONOI2: LazyImage = lazy_image!(512, 512, VoronoiImage::new(5));
+
+static LAYERED_VORONOI: LazyImage = lazy_image!(
     512,
     512,
-    VoronoiImage::new3d(5).map_value(|_, x| x.powf(3.))
+    VoronoiImage {
+        scale: 6,
+        randomness: 1.,
+        seed: 4
+    }
+    .with_layered(2, 0.5, 1.8)
+);
+
+static MINKOWSKI: LazyImage = lazy_image!(
+    512,
+    512,
+    VoronoiImage::new(5).with_distance_fn(MinkowskiLength(0.6))
+);
+
+static VORONOI_DISSOLVE: LazyImage =
+    lazy_image!(512, 512, VoronoiImage::new(5).map_value(|_, x| x.powf(3.)));
+
+static WAVE: LazyImage = lazy_image!(
+    512,
+    512,
+    WaveImage {
+        scale: 5,
+        angle: WaveAngle::Angle(f32::to_radians(30.)),
+        phase_offset: 0.0
+    }
 );
 
 pub fn init(mut commands: Commands, mut assets: CachedAssetServer) {
@@ -61,7 +92,7 @@ pub fn init(mut commands: Commands, mut assets: CachedAssetServer) {
             ChildOf(root),
             Container {
                 layout: LayoutObject::new(ParagraphLayout::PARAGRAPH),
-                margin: Vec2::new(5., 5.),
+                //margin: Vec2::new(5., 5.),
                 ..Default::default()
             },
             Transform2D::default(),
@@ -82,12 +113,27 @@ pub fn init(mut commands: Commands, mut assets: CachedAssetServer) {
         ));
     };
 
-    spawn(PERLIN.get(&mut assets));
+    spawn(BASE.get(&mut assets));
     spawn(WIDE.get(&mut assets));
     spawn(TALL.get(&mut assets));
     spawn(FBM.get(&mut assets));
     spawn(VORONOI.get(&mut assets));
-    spawn(VORONOI3D.get(&mut assets));
-    spawn(DISTORT_VORONOI.get(&mut assets));
+    spawn(VORONOI2.get(&mut assets));
+    spawn(LAYERED_VORONOI.get(&mut assets));
     spawn(VORONOI_DISSOLVE.get(&mut assets));
+    spawn(MINKOWSKI.get(&mut assets));
+    spawn(WAVE.get(&mut assets));
+    spawn(WAVE.get(&mut assets));
+}
+
+fn margin(mut query: Query<&mut Container>, keyboard: ResMut<ButtonInput<KeyCode>>) {
+    if keyboard.just_pressed(KeyCode::Space) {
+        for mut container in query.iter_mut() {
+            if container.margin == Vec2::new(0., 0.) {
+                container.margin = Vec2::new(5., 5.);
+            } else {
+                container.margin = Vec2::ZERO;
+            }
+        }
+    }
 }

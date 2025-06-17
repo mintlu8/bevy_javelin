@@ -16,7 +16,7 @@ use bevy_javelin::{
     spawning::{ProjectileSpawning, SpawnRate},
     util::{ConditionOnce, PhysicsExt, ProjectileRng},
 };
-use bevy_texture_gen::{FbmPerlinImage, ImageBuilder, LazyImage, VoronoiImage, lazy_image};
+use bevy_texture_gen::{FbmNoiseImage, IntoImageBuilder, LazyImage, VoronoiImage, lazy_image};
 use fastrand::Rng;
 use ramp_gen::ramp;
 
@@ -47,7 +47,7 @@ static FIREBALL_TEX: LazyImage = lazy_image!(
 static FIREBALL_NOISE: LazyImage = lazy_image!(
     256,
     256,
-    FbmPerlinImage::new().map_value(|_, x| x.powi(3)),
+    FbmNoiseImage::default().map_value(|_, x| x.powi(3)),
     Repeat,
     Repeat
 );

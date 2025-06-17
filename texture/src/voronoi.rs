@@ -1,87 +1,176 @@
-use bevy::math::Vec2;
+use bevy::math::{Vec2, Vec3};
 use noiz::{
-    Noise, SampleableFor,
+    Noise,
+    cell_noise::WorleyMode,
     cells::{OrthoGrid, Voronoi},
-    prelude::{EuclideanLength, PerCellPointDistances, WorleyLeastDistance},
+    lengths::LengthFunction,
+    prelude::{
+        EuclideanLength, FractalLayers, LayeredNoise, Normed, Octave, PerCellPointDistances,
+        Persistence, WorleyLeastDistance,
+    },
     rng::NoiseRng,
 };
 
-use crate::ImageBuilder;
-
-pub type VoronoiNoise = Noise<
-    PerCellPointDistances<Voronoi<false, OrthoGrid<i32>>, EuclideanLength, WorleyLeastDistance>,
->;
+use crate::{ImageBuilder, IntoImageBuilder, NoiseImage};
 
 pub struct VoronoiImage {
-    pub noise: Noise<
-        PerCellPointDistances<Voronoi<false, OrthoGrid<i32>>, EuclideanLength, WorleyLeastDistance>,
-    >,
-    /// If some, 3d, else 2d.
-    pub z: Option<f32>,
+    /// Since this is supposed to tile, the grid scale has to be an integer.
+    pub scale: u32,
+    pub randomness: f32,
+    pub seed: u32,
 }
 
 impl Default for VoronoiImage {
     fn default() -> Self {
-        Self::new(5)
+        Self {
+            scale: 5,
+            randomness: 1.,
+            seed: 0,
+        }
     }
+}
+
+pub struct GenericVoronoiImage<M: WorleyMode, L: LengthFunction<Vec2> + LengthFunction<Vec3>> {
+    pub base: VoronoiImage,
+    pub mode: M,
+    pub length: L,
+}
+
+pub struct LayeredVoronoiImage<W: WorleyMode, L: LengthFunction<Vec2> + LengthFunction<Vec3>> {
+    pub voronoi: GenericVoronoiImage<W, L>,
+    pub detail: u32,
+    pub roughness: f32,
+    pub lacunarity: f32,
 }
 
 impl VoronoiImage {
-    pub fn new(frequency: i32) -> Self {
-        let mut noise = VoronoiNoise::default();
-        noise.frequency = frequency as f32;
-        noise.noise.cells.partitoner.0 = frequency;
-        Self { noise, z: None }
+    pub fn new(scale: u32) -> VoronoiImage {
+        VoronoiImage {
+            scale,
+            randomness: 1.,
+            seed: 0,
+        }
     }
 
-    pub fn new3d(frequency: i32) -> Self {
-        let mut noise = VoronoiNoise::default();
-        noise.frequency = frequency as f32;
-        noise.noise.cells.partitoner.0 = frequency;
-        Self { noise, z: Some(0.) }
-    }
-    pub fn new_seeded(frequency: i32, seed: u32) -> Self {
-        let mut noise = VoronoiNoise::default();
-        noise.frequency = frequency as f32;
-        noise.noise.cells.partitoner.0 = frequency;
-        noise.seed = NoiseRng(seed);
-        Self { noise, z: None }
-    }
-
-    pub fn new3d_seeded(frequency: i32, seed: u32) -> Self {
-        let mut noise = VoronoiNoise::default();
-        noise.frequency = frequency as f32;
-        noise.noise.cells.partitoner.0 = frequency;
-        noise.seed = NoiseRng(seed);
-        Self { noise, z: Some(0.) }
+    pub fn with_layered(
+        self,
+        detail: u32,
+        roughness: f32,
+        lacunarity: f32,
+    ) -> LayeredVoronoiImage<WorleyLeastDistance, EuclideanLength> {
+        LayeredVoronoiImage {
+            voronoi: GenericVoronoiImage {
+                base: self,
+                mode: WorleyLeastDistance,
+                length: EuclideanLength,
+            },
+            detail,
+            roughness,
+            lacunarity,
+        }
     }
 
-    // /// Sets the distance function used by the Worley cells.
-    // pub fn set_distance_function(mut self, function: impl Fn(Vec2) -> f32 + 'static) -> Self {
-    //     self.noise.noise.length_mode =
-    //     self
-    // }
+    pub fn with_mode<W: WorleyMode>(self, mode: W) -> GenericVoronoiImage<W, EuclideanLength> {
+        GenericVoronoiImage {
+            base: self,
+            mode,
+            length: EuclideanLength,
+        }
+    }
 
-    // /// Enables or disables applying the distance from the nearest seed point
-    // /// to the output value.
-    // pub fn set_return_type(mut self, return_type: ReturnType) -> Self {
-    //     self.noise = self.noise.set_return_type(return_type);
-    //     self
-    // }
+    pub fn with_distance_fn<L: LengthFunction<Vec2> + LengthFunction<Vec3>>(
+        self,
+        distance: L,
+    ) -> GenericVoronoiImage<WorleyLeastDistance, L> {
+        GenericVoronoiImage {
+            base: self,
+            mode: WorleyLeastDistance,
+            length: distance,
+        }
+    }
 
-    // /// Sets the frequency of the seed points.
-    // pub fn set_frequency(mut self, frequency: usize) -> Self {
-    //     self.noise = self.noise.set_frequency(frequency as f64);
-    //     self
-    // }
+    pub fn with_mode_distance_fn<M, L>(self, mode: M, distance: L) -> GenericVoronoiImage<M, L>
+    where
+        M: WorleyMode,
+        L: LengthFunction<Vec2> + LengthFunction<Vec3>,
+    {
+        GenericVoronoiImage {
+            base: self,
+            mode,
+            length: distance,
+        }
+    }
 }
 
-impl ImageBuilder for VoronoiImage {
-    fn sample(&self, position: Vec2) -> f32 {
-        if let Some(z) = self.z {
-            self.noise.sample(position.extend(z))
-        } else {
-            self.noise.sample(position)
+impl<W: WorleyMode, L: LengthFunction<Vec2> + LengthFunction<Vec3>> GenericVoronoiImage<W, L> {
+    pub fn with_layered(
+        self,
+        detail: u32,
+        roughness: f32,
+        lacunarity: f32,
+    ) -> LayeredVoronoiImage<W, L> {
+        LayeredVoronoiImage {
+            voronoi: self,
+            detail,
+            roughness,
+            lacunarity,
         }
+    }
+}
+
+impl IntoImageBuilder for VoronoiImage {
+    fn into_image_builder(self) -> impl ImageBuilder {
+        GenericVoronoiImage {
+            base: self,
+            mode: WorleyLeastDistance,
+            length: EuclideanLength,
+        }
+        .into_image_builder()
+    }
+}
+
+impl<W: WorleyMode, L: LengthFunction<Vec2> + LengthFunction<Vec3>> IntoImageBuilder
+    for GenericVoronoiImage<W, L>
+{
+    fn into_image_builder(self) -> impl ImageBuilder {
+        NoiseImage(Noise {
+            noise: PerCellPointDistances {
+                cells: Voronoi::<false, OrthoGrid<i32>> {
+                    partitoner: OrthoGrid(self.base.scale as i32),
+                    randomness: self.base.randomness,
+                },
+                length_mode: self.length,
+                worley_mode: self.mode,
+            },
+            seed: NoiseRng(self.base.seed),
+            frequency: self.base.scale as f32,
+        })
+    }
+}
+
+impl<W: WorleyMode, L: LengthFunction<Vec2> + LengthFunction<Vec3>> IntoImageBuilder
+    for LayeredVoronoiImage<W, L>
+{
+    fn into_image_builder(self) -> impl ImageBuilder {
+        NoiseImage(Noise {
+            noise: LayeredNoise::new(
+                Normed::<f32>::default(),
+                Persistence(self.roughness),
+                FractalLayers {
+                    layer: Octave(PerCellPointDistances {
+                        cells: Voronoi::<false, OrthoGrid<i32>> {
+                            partitoner: OrthoGrid(self.voronoi.base.scale as i32),
+                            randomness: self.voronoi.base.randomness,
+                        },
+                        length_mode: self.voronoi.length,
+                        worley_mode: self.voronoi.mode,
+                    }),
+                    lacunarity: self.lacunarity,
+                    amount: self.detail.max(1),
+                },
+            ),
+            seed: NoiseRng(self.voronoi.base.seed),
+            frequency: self.voronoi.base.scale as f32,
+        })
     }
 }
