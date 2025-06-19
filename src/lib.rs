@@ -64,7 +64,7 @@ pub fn projectile_update(
         let projectile = projectile.into_inner();
         if projectile.done {
             if projectile.root && projectile.rc.should_drop() {
-                commands.entity(entity).despawn();
+                commands.entity(entity).try_despawn();
             }
             continue;
         }

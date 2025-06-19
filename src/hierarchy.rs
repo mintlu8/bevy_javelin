@@ -10,7 +10,7 @@ use bevy::{
 
 /// Alternative children that does not inherit transform.
 #[derive(Debug, Component)]
-#[relationship_target(relationship = WorldSpaceChildOf)]
+#[relationship_target(relationship = WorldSpaceChildOf, linked_spawn)]
 pub struct WorldSpaceChildren(Vec<Entity>);
 
 impl<'t> IntoIterator for &'t WorldSpaceChildren {

@@ -1,5 +1,6 @@
 use std::{
     any::{Any, type_name},
+    fmt::Debug,
     ops::{Deref, DerefMut},
     sync::{Arc, Weak},
 };
@@ -228,10 +229,25 @@ pub trait ErasedProjectile: Send + Sync + 'static {
     fn apply_command(&mut self, command: &dyn Any) -> bool;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) enum ProjectileRc {
     Owned(Arc<()>),
     Released(Weak<()>),
+}
+
+impl Debug for ProjectileRc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Owned(x) => f
+                .debug_tuple("ProjectileRc")
+                .field(&Arc::strong_count(x))
+                .finish(),
+            Self::Released(x) => f
+                .debug_tuple("ReleasedProjectileRc")
+                .field(&Weak::strong_count(x))
+                .finish(),
+        }
+    }
 }
 
 impl ProjectileRc {

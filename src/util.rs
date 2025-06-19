@@ -270,3 +270,51 @@ impl<T: Copy> RetainedValue<T> {
         self.0
     }
 }
+
+pub trait Ramp<V>: Sized {
+    /// Linear float ramp.
+    fn ramp(&self, points: &[(Self, V)]) -> V;
+    /// Smoothstep float ramp.
+    fn ease_ramp(&self, points: &[(Self, V)]) -> V;
+}
+
+impl<V: Copy + Add<V, Output = V> + Sub<V, Output = V> + Mul<f32, Output = V>> Ramp<V> for f32 {
+    fn ramp(&self, points: &[(Self, V)]) -> V {
+        if points.is_empty() {
+            panic!("Expected at least one item");
+        }
+        let x = *self;
+        if x <= points[0].0 {
+            return points[0].1;
+        }
+        for i in 0..points.len() - 1 {
+            if x <= points[i + 1].0 {
+                let (x0, y0) = points[i];
+                let (x1, y1) = points[i + 1];
+                let v = (x - x0) / (x1 - x0);
+                return y0 * (1.0 - v) + y1 * v;
+            }
+        }
+        points.last().unwrap().1
+    }
+
+    fn ease_ramp(&self, points: &[(Self, V)]) -> V {
+        if points.is_empty() {
+            panic!("Expected at least one item");
+        }
+        let x = *self;
+        if x <= points[0].0 {
+            return points[0].1;
+        }
+        for i in 0..points.len() - 1 {
+            if x <= points[i + 1].0 {
+                let (x0, y0) = points[i];
+                let (x1, y1) = points[i + 1];
+                let v = (x - x0) / (x1 - x0);
+                let v = 3. * v * v - 2. * v * v * v;
+                return y0 * (1.0 - v) + y1 * v;
+            }
+        }
+        points.last().unwrap().1
+    }
+}

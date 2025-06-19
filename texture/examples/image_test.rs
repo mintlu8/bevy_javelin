@@ -8,10 +8,7 @@ use bevy::{
         system::{Commands, Query, ResMut},
     },
     image::Image,
-    input::{
-        ButtonInput,
-        keyboard::KeyCode,
-    },
+    input::{ButtonInput, keyboard::KeyCode},
     math::Vec2,
     sprite::Sprite,
 };
