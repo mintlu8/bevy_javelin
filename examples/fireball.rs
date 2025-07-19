@@ -10,8 +10,7 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderRef},
 };
 use bevy_javelin::{
-    Projectile, ProjectileBundle, ProjectileContext, ProjectileInstance, ProjectilePlugin,
-    ProjectileSpawner,
+    Projectile, ProjectileContext, ProjectileInstance, ProjectilePlugin,
     loading::{AddMat3, AddMesh3, LoadMesh3},
     spawning::{ProjectileSpawning, SpawnRate},
     util::{ConditionOnce, PhysicsExt, ProjectileRng},
@@ -116,7 +115,7 @@ fn setup(
         .id();
 
     commands.spawn((
-        ProjectileInstance::spawner(FireballSpawner {
+        ProjectileInstance::new(FireballSpawner {
             enemy,
             rate: SpawnRate::new(0.5).with_spawn_immediately(1),
             rng: Rng::new(),
@@ -164,12 +163,10 @@ struct FireballSpawner {
     rng: Rng,
 }
 
-impl ProjectileSpawner for FireballSpawner {
-    fn spawn_projectile(
-        &mut self,
-        cx: &mut ProjectileContext,
-    ) -> Option<impl ProjectileBundle + use<>> {
-        self.rate.spawn(|| {
+impl Projectile for FireballSpawner {
+    fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {
+        self.rate.update(dt);
+        self.rate.spawn_world(cx, |cx| {
             (
                 HomingFireball {
                     target: self.enemy,
@@ -191,11 +188,7 @@ impl ProjectileSpawner for FireballSpawner {
                 }),
                 *cx.transform(),
             )
-        })
-    }
-
-    fn update(&mut self, _: &mut ProjectileContext, dt: f32) {
-        self.rate.update(dt);
+        });
     }
 }
 
@@ -208,7 +201,7 @@ struct HomingFireball {
 
 impl Projectile for HomingFireball {
     fn is_expired(&self, _: &ProjectileContext) -> bool {
-        self.hit.is_activated()
+        self.hit.is_true()
     }
 
     fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {
@@ -220,19 +213,7 @@ impl Projectile for HomingFireball {
         self.hit
             .set(|| (cx.transform().translation - target).length_squared() < 0.5);
         self.smoke_spawning.update(dt);
-    }
-
-    fn as_spawner(&mut self) -> Option<&mut impl ProjectileSpawner> {
-        Some(self)
-    }
-}
-
-impl ProjectileSpawner for HomingFireball {
-    fn spawn_projectile(
-        &mut self,
-        cx: &mut ProjectileContext,
-    ) -> Option<impl ProjectileBundle + use<>> {
-        self.smoke_spawning.spawn(|| {
+        self.smoke_spawning.spawn_world(cx, |cx| {
             (
                 Smoke,
                 LoadMesh3("smoke.glb#Mesh0/Primitive0"),
@@ -248,7 +229,7 @@ impl ProjectileSpawner for HomingFireball {
                     scale: Vec3::splat(0.3),
                 },
             )
-        })
+        });
     }
 }
 

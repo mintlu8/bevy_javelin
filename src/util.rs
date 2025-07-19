@@ -1,5 +1,6 @@
 //! Utility for implementing particles.
 
+use core::f32;
 use std::{
     f32::consts::PI,
     ops::{Add, AddAssign, Div, Mul, Range, Sub},
@@ -205,10 +206,12 @@ where
 pub struct ConditionOnce(bool);
 
 impl ConditionOnce {
+    #[inline]
     pub const fn new() -> ConditionOnce {
         ConditionOnce(false)
     }
 
+    #[inline]
     pub fn if_then<T>(&mut self, cond: bool, then: impl FnOnce() -> T) -> Option<T> {
         if !self.0 && cond {
             self.0 = true;
@@ -218,10 +221,14 @@ impl ConditionOnce {
         }
     }
 
-    pub fn is_activated(&self) -> bool {
+    /// Returns `true` if set, will never return false in the future unless mem::replaced.
+    #[inline]
+    pub fn is_true(&self) -> bool {
         self.0
     }
 
+    /// Set the value if returns true, condition will not be ran in the future if returned true once.
+    #[inline]
     pub fn set(&mut self, condition: impl FnOnce() -> bool) -> bool {
         if !self.0 {
             self.0 = condition()
@@ -239,6 +246,7 @@ impl Counter {
 
     /// Obtain the next value and increment the counter.
     #[allow(clippy::should_implement_trait)]
+    #[inline]
     pub fn next(&mut self) -> usize {
         let result = self.0;
         self.0 += 1;
@@ -248,10 +256,13 @@ impl Counter {
 
 /// A dynamic value getter that retains its previous value
 /// if the value source is removed.
+/// 
+/// This is useful for tracking projectiles.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RetainedValue<T>(pub T);
 
 impl<T: Copy> RetainedValue<T> {
+    #[inline]
     pub fn get(&mut self, new: Option<T>) -> T {
         if let Some(value) = new {
             self.0 = value
@@ -259,6 +270,7 @@ impl<T: Copy> RetainedValue<T> {
         self.0
     }
 
+    #[inline]
     pub fn get_with(&mut self, new: impl FnOnce() -> Option<T>) -> T {
         if let Some(value) = new() {
             self.0 = value
@@ -266,6 +278,7 @@ impl<T: Copy> RetainedValue<T> {
         self.0
     }
 
+    #[inline]
     pub fn current(&self) -> T {
         self.0
     }
@@ -316,5 +329,59 @@ impl<V: Copy + Add<V, Output = V> + Sub<V, Output = V> + Mul<f32, Output = V>> R
             }
         }
         points.last().unwrap().1
+    }
+}
+
+/// A utility type that caches the previous value and compares only
+/// if ascending or descending.
+///
+/// This is useful for despawning trails.
+pub struct LengthDetection {
+    prev: f32,
+    completed: bool,
+}
+
+impl Default for LengthDetection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LengthDetection {
+    pub const fn new() -> Self {
+        LengthDetection {
+            prev: f32::NAN,
+            completed: false,
+        }
+    }
+
+    pub fn get(&self) -> bool {
+        self.completed
+    }
+
+    pub fn is_descending_and(&mut self, val: f32, f: impl FnOnce(f32) -> bool) -> bool {
+        if self.completed {
+            return true;
+        }
+        if self.prev > val && f(val) {
+            self.completed = true;
+            true
+        } else {
+            self.prev = val;
+            false
+        }
+    }
+
+    pub fn is_ascending_and(&mut self, val: f32, f: impl FnOnce(f32) -> bool) -> bool {
+        if self.completed {
+            return true;
+        }
+        if self.prev < val && f(val) {
+            self.completed = true;
+            true
+        } else {
+            self.prev = val;
+            false
+        }
     }
 }

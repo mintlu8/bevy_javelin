@@ -37,7 +37,7 @@ fn setup(
         Transform::from_translation(Vec3::new(10., 10., -10.)).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
-    commands.spawn(ProjectileInstance::spawner(
+    commands.spawn(ProjectileInstance::new(
         SpawnRate::new(4.).into_spawner_world(|rng, _| {
             (
                 MyProjectile {

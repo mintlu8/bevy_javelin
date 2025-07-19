@@ -8,18 +8,17 @@ use bevy::ecs::{
 };
 
 use crate::{
-    ProjectileContext, ProjectileInstance, ProjectileSpawner,
+    Projectile, ProjectileContext, ProjectileInstance,
     traits::{ErasedProjectile, ProjectileRc},
 };
 
 #[derive(Debug, Clone)]
-pub struct SpawnerCluster<T: ProjectileSpawner>(Vec<T>);
+pub struct ProjectileCluster<T: Projectile>(Vec<T>);
 
-impl ProjectileInstance {
-    /// Create from a list of projectile spawners, spawns each as local space children and shares projectile events.
-    pub fn from_spawner_iter(iter: impl IntoIterator<Item: ProjectileSpawner>) -> Self {
+impl<T: Projectile> FromIterator<T> for ProjectileInstance {
+    fn from_iter<A: IntoIterator<Item = T>>(iter: A) -> Self {
         Self {
-            projectile: Box::new(SpawnerCluster::from_iter(iter)),
+            projectile: Box::new(ProjectileCluster::from_iter(iter)),
             lifetime: 0.,
             rc: ProjectileRc::new(),
             done: false,
@@ -28,13 +27,13 @@ impl ProjectileInstance {
     }
 }
 
-impl<T: ProjectileSpawner> FromIterator<T> for SpawnerCluster<T> {
+impl<T: Projectile> FromIterator<T> for ProjectileCluster<T> {
     fn from_iter<A: IntoIterator<Item = T>>(iter: A) -> Self {
         Self(iter.into_iter().collect())
     }
 }
 
-impl<T: ProjectileSpawner> ErasedProjectile for SpawnerCluster<T> {
+impl<T: Projectile> ErasedProjectile for ProjectileCluster<T> {
     fn type_name(&self) -> &'static str {
         type_name::<Self>()
     }
@@ -53,7 +52,7 @@ impl<T: ProjectileSpawner> ErasedProjectile for SpawnerCluster<T> {
 
     fn update(&mut self, mut cx: ProjectileContext, _: f32) -> bool {
         for item in self.0.drain(..) {
-            cx.spawn_related::<ChildOf>(ProjectileInstance::spawner_with_reference(item, cx.rc));
+            cx.spawn_related::<ChildOf>(ProjectileInstance::new_with_reference(item, cx.rc));
         }
         true
     }

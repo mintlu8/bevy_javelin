@@ -10,21 +10,17 @@ use bevy::{
         bundle::Bundle,
         component::Component,
         entity::Entity,
-        hierarchy::{ChildOf, Children},
+        hierarchy::Children,
         world::{EntityMutExcept, Mut},
     },
     render::view::Visibility,
     transform::components::Transform,
 };
 
-use crate::{
-    ProjectileBundle, ProjectileContext, WorldSpaceChildOf, WorldSpaceChildren,
-    builder::WithSpawner,
-};
+use crate::{ProjectileContext, WorldSpaceChildren, builder::ProjectileJoin};
 
 struct DummyProjectile;
 
-impl ProjectileSpawner for DummyProjectile {}
 impl Projectile for DummyProjectile {}
 
 /// Local space or world space.
@@ -34,128 +30,7 @@ pub enum ProjectileSpace {
     World,
 }
 
-/// The core projectile spawner trait.
-///
-/// A [`Projectile`] can also be a spawner via implementing [`Projectile::as_spawner`].
-///
-/// If a spawner is not a projectile, use [`ProjectileInstance::spawner`] to type erase and spawn it.
-///
-/// # How to implement
-///
-/// The simplist way to implement this trait is to use [`SpawnRate`](crate::spawning::SpawnRate).
-/// We call `SpawnRate::update` in `update_spawner` and use `SpawnRate::spawn` in `spawn_projectile`.`
-#[allow(unused_variables)]
-pub trait ProjectileSpawner: Send + Sync + 'static {
-    /// If should spawn, returns a [`Projectile`] and its supporting components
-    /// like `Mesh3d` and `MaterialMesh3d`.
-    /// This is run multiple times per frame until it returns [`None`].
-    ///
-    /// For a leaf projectile, do not implement this function.
-    ///
-    /// Example pattern:
-    ///
-    /// ```
-    /// if fac > 1.0 {
-    ///     fac -= 1.0;
-    ///     Some(MyProjectile { .. })
-    /// } else {
-    ///     None
-    /// }
-    /// ```
-    ///
-    /// Keep in mind [`ProjectileInstance`] requires [`Transform`] and [`Visibility`]
-    /// so these are not required to be specified.
-    ///
-    /// # Returns
-    ///
-    /// Either a `impl Projectile` or
-    /// A tuple of `(impl Projectile, impl Bundle, impl Bundle, ..)`.
-    ///
-    /// Additionally in the bundle slots you can use items that implement
-    /// `BundleOrAsset` like [`AddMat3`](crate::loading::AddMat3), to
-    /// add or load assets directly.
-    fn spawn_projectile(
-        &mut self,
-        cx: &mut ProjectileContext,
-    ) -> Option<impl ProjectileBundle + use<Self>> {
-        None::<DummyProjectile>
-    }
-
-    /// Returns if the projectile is in local or world space.
-    ///
-    /// Local space uses bevy's `Children` while world space uses [`WorldSpaceChildren`](crate::WorldSpaceChildren).
-    fn space(&self) -> ProjectileSpace {
-        ProjectileSpace::World
-    }
-
-    /// Runs every frame to update its content.
-    /// If is also a projectile, run after `update_projectile`.
-    fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {}
-
-    /// Run a dynamic command on this.
-    fn apply_command(&mut self, command: &dyn Any) {}
-
-    /// Optional value that is used to calculate `fac` and
-    /// by default sets `is_complete` once `lifetime` reaches `duration`.
-    ///
-    /// Keep in mind `fac` is optional and `is_complete` can be overwritten.
-    ///
-    /// # Note
-    ///
-    /// Only the first `duration` will affect the `fac` returned by [`ProjectileContext`],
-    /// the implementation on [`Projectile`] takes priority.
-    fn duration(&self) -> f32 {
-        f32::MAX
-    }
-
-    /// Modifies `fac`, or `lifetime / duration` by an easing curve.
-    ///
-    /// # Note
-    ///
-    /// Only the first `fac_curve` will affect the `fac` returned by [`ProjectileContext`],
-    /// the implementation on [`Projectile`] takes priority.
-    fn fac_curve(&self, fac: f32) -> f32 {
-        fac
-    }
-
-    /// Returns true if spawning is finished.
-    ///
-    /// If done, `update` will not be called and make this eligible for deletion.
-    ///
-    /// By default checks `lifetime > duration`.
-    fn is_complete(&self, cx: &ProjectileContext) -> bool {
-        cx.lifetime > self.duration()
-    }
-
-    /// Return a list of [`Entity`] child projectiles, must be [`ProjectileInstance`]s.
-    ///
-    /// By default, this returns [`Children`] if found, otherwise [`WorldSpaceChildren`], otherwise `[]`,
-    /// rewrite this if you need a more efficient or different algorithm.
-    fn children(&self, cx: &EntityMutExcept<impl Bundle>) -> impl Iterator<Item = Entity> {
-        cx.get::<Children>()
-            .map(|x| x.iter().copied())
-            .or_else(|| cx.get::<WorldSpaceChildren>().map(|x| x.into_iter()))
-            .unwrap_or([].iter().copied())
-    }
-
-    /// Should be used if we want to spawn multiple types of projectiles.
-    fn extension(&mut self) -> Option<&mut impl ProjectileSpawner> {
-        None::<&mut DummyProjectile>
-    }
-
-    /// Join with a spawner that spawns different projectiles.
-    fn with_extension<T: ProjectileSpawner>(self, extension: T) -> WithSpawner<Self, T>
-    where
-        Self: Sized,
-    {
-        WithSpawner {
-            base: self,
-            spawner: extension,
-        }
-    }
-}
-
-/// The core projectile trait.
+/// A projectile or a spawner.
 #[allow(unused_variables)]
 pub trait Projectile: Send + Sync + 'static {
     /// Optional value that is used to calculate `fac` and
@@ -181,6 +56,8 @@ pub trait Projectile: Send + Sync + 'static {
     }
 
     /// Updates the projectile, will not be called if expired.
+    ///
+    /// If this is a spawner, spawn child projectiles here.
     fn update(&mut self, cx: &mut ProjectileContext, dt: f32) {}
 
     /// Run once when projectile is created.
@@ -193,22 +70,35 @@ pub trait Projectile: Send + Sync + 'static {
         cx.despawn();
     }
 
-    /// Run a dynamic command on this.
-    fn apply_command(&mut self, command: &dyn Any) {}
+    /// Run a dynamic command on this, returns true if valid.
+    fn apply_command(&mut self, command: &dyn Any) -> bool {
+        false
+    }
 
-    /// If this projectile spawns child projectiles, add them here.
-    fn as_spawner(&mut self) -> Option<&mut impl ProjectileSpawner> {
+    /// Return a list of [`Entity`] child projectiles, must be [`ProjectileInstance`]s.
+    ///
+    /// By default, this returns [`Children`] if found, otherwise [`WorldSpaceChildren`], otherwise `[]`,
+    /// rewrite this if you need a more efficient or different algorithm.
+    fn children(&self, cx: &EntityMutExcept<impl Bundle>) -> impl Iterator<Item = Entity> {
+        cx.get::<Children>()
+            .map(|x| x.iter().copied())
+            .or_else(|| cx.get::<WorldSpaceChildren>().map(|x| x.into_iter()))
+            .unwrap_or([].iter().copied())
+    }
+
+    /// Should be used if we want to spawn multiple types of projectiles.
+    fn extension(&mut self) -> Option<&mut impl Projectile> {
         None::<&mut DummyProjectile>
     }
 
-    /// Join with a spawner that spawns child projectiles.
-    fn with_spawner<T: ProjectileSpawner>(self, extension: T) -> WithSpawner<Self, T>
+    /// Join with another projectile to share their behaviors, usually used to add a spawner to a projectile.
+    fn with_extension<T: Projectile>(self, extension: T) -> ProjectileJoin<Self, T>
     where
         Self: Sized,
     {
-        WithSpawner {
+        ProjectileJoin {
             base: self,
-            spawner: extension,
+            extension,
         }
     }
 }
@@ -328,29 +218,6 @@ impl ProjectileInstance {
         }
     }
 
-    pub fn spawner(projectile: impl ProjectileSpawner) -> Self {
-        ProjectileInstance {
-            projectile: Box::new(ErasedSpawner(projectile)),
-            lifetime: 0.0,
-            rc: ProjectileRc::new(),
-            done: false,
-            root: true,
-        }
-    }
-
-    pub(crate) fn spawner_with_reference(
-        projectile: impl ProjectileSpawner,
-        reference: &ProjectileRc,
-    ) -> Self {
-        ProjectileInstance {
-            projectile: Box::new(ErasedSpawner(projectile)),
-            lifetime: 0.0,
-            rc: reference.clone(),
-            done: false,
-            root: false,
-        }
-    }
-
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.projectile.as_any().downcast_ref()
     }
@@ -378,36 +245,6 @@ impl DerefMut for ProjectileInstance {
     }
 }
 
-struct ErasedSpawner<T>(T);
-
-impl<T: ProjectileSpawner> ErasedProjectile for ErasedSpawner<T> {
-    fn update(&mut self, mut cx: ProjectileContext, dt: f32) -> bool {
-        update_spawner(&mut self.0, &mut cx, dt);
-        spawner_done(&mut self.0, &cx)
-    }
-
-    fn apply_command(&mut self, command: &dyn Any) -> bool {
-        apply_command_on_spawner(&mut self.0, command);
-        false
-    }
-
-    fn get_fac(&self, lifetime: f32) -> f32 {
-        self.0.fac_curve(lifetime / self.0.duration())
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        &self.0
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        &mut self.0
-    }
-
-    fn type_name(&self) -> &'static str {
-        type_name::<T>()
-    }
-}
-
 struct ErasedProjectileInst<T> {
     projectile: T,
     once: bool,
@@ -424,26 +261,21 @@ impl<T: Projectile> ErasedProjectile for ErasedProjectileInst<T> {
                 self.once = true;
                 self.projectile.on_create(&mut cx);
             }
-            Projectile::update(&mut self.projectile, &mut cx, dt);
-            if self.projectile.is_expired(&cx) {
+            update_recursive(&mut self.projectile, &mut cx, dt);
+            if is_expired_recursive(&mut self.projectile, &cx) {
                 self.expired = true;
                 self.projectile.on_expire(&mut cx);
+                true
+            } else {
+                false
             }
-        }
-        if let Some(spawner) = self.projectile.as_spawner() {
-            update_spawner(spawner, &mut cx, dt);
-            spawner_done(spawner, &cx) && self.expired
         } else {
-            self.expired
+            true
         }
     }
 
     fn apply_command(&mut self, command: &dyn Any) -> bool {
-        self.projectile.apply_command(command);
-        if let Some(spawner) = self.projectile.as_spawner() {
-            apply_command_on_spawner(spawner, command);
-        }
-        false
+        apply_command_recursive(&mut self.projectile, command)
     }
 
     fn get_fac(&self, lifetime: f32) -> f32 {
@@ -464,44 +296,22 @@ impl<T: Projectile> ErasedProjectile for ErasedProjectileInst<T> {
     }
 }
 
-fn spawner_done<T: ProjectileSpawner>(this: &mut T, cx: &ProjectileContext) -> bool {
-    this.is_complete(cx) && this.extension().is_none_or(|x| spawner_done(x, cx))
+fn is_expired_recursive<T: Projectile>(this: &mut T, cx: &ProjectileContext) -> bool {
+    this.is_expired(cx) && this.extension().is_none_or(|x| is_expired_recursive(x, cx))
 }
 
-fn apply_command_on_spawner<T: ProjectileSpawner>(this: &mut T, command: &dyn Any) {
-    this.apply_command(command);
+fn apply_command_recursive<T: Projectile>(this: &mut T, command: &dyn Any) -> bool {
+    let mut result = false;
+    result |= this.apply_command(command);
     if let Some(ext) = this.extension() {
-        apply_command_on_spawner(ext, command);
+        result |= apply_command_recursive(ext, command);
     }
+    result
 }
 
-fn update_spawner<T: ProjectileSpawner>(this: &mut T, cx: &mut ProjectileContext, dt: f32) {
-    if !this.is_complete(cx) {
-        ProjectileSpawner::update(this, cx, dt);
-        while let Some(projectile) = this.spawn_projectile(cx) {
-            let (projectile, bundle) =
-                projectile.into_projectile_bundle(&mut cx.resources, &mut cx.commands);
-            let entity = cx.entity();
-            match this.space() {
-                ProjectileSpace::Local => {
-                    cx.commands.spawn((
-                        ChildOf(entity),
-                        ProjectileInstance::new_with_reference(projectile, cx.rc),
-                        bundle,
-                    ));
-                }
-                ProjectileSpace::World => {
-                    cx.commands.spawn((
-                        WorldSpaceChildOf(entity),
-                        ProjectileInstance::new_with_reference(projectile, cx.rc),
-                        bundle,
-                    ));
-                }
-            }
-        }
-    }
-
+fn update_recursive<T: Projectile>(this: &mut T, cx: &mut ProjectileContext, dt: f32) {
+    Projectile::update(this, cx, dt);
     if let Some(ext) = this.extension() {
-        update_spawner(ext, cx, dt);
+        update_recursive(ext, cx, dt);
     }
 }

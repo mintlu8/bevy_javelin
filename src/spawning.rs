@@ -3,9 +3,7 @@ use std::ops::RangeInclusive;
 use bevy::ecs::hierarchy::Children;
 use fastrand::Rng;
 
-use crate::{
-    ProjectileBundle, ProjectileContext, ProjectileSpace, ProjectileSpawner, WorldSpaceChildren,
-};
+use crate::{Projectile, ProjectileBundle, ProjectileContext, ProjectileSpace, WorldSpaceChildren};
 
 /// A projectile spawning rate controller.
 pub trait ProjectileSpawning: Send + Sync + Sized + 'static {
@@ -16,8 +14,32 @@ pub trait ProjectileSpawning: Send + Sync + Sized + 'static {
     fn finished(&self) -> bool;
 
     /// If should spawn, call the function.
-    fn spawn<T>(&mut self, f: impl FnOnce() -> T) -> Option<T> {
+    fn spawn_once<T>(&mut self, f: impl FnOnce() -> T) -> Option<T> {
         if self.try_spawn() { Some(f()) } else { None }
+    }
+
+    /// Spawn a [`ProjectileBundle`] as a local space children.
+    fn spawn_local<T: ProjectileBundle>(
+        &mut self,
+        cx: &mut ProjectileContext,
+        mut f: impl FnMut(&mut ProjectileContext) -> T,
+    ) {
+        for _ in 0..self.spawn_count() {
+            let bun = f(cx);
+            cx.spawn_world_space(bun);
+        }
+    }
+
+    /// Spawn a [`ProjectileBundle`] as a world space children.
+    fn spawn_world<T: ProjectileBundle>(
+        &mut self,
+        cx: &mut ProjectileContext,
+        mut f: impl FnMut(&mut ProjectileContext) -> T,
+    ) {
+        for _ in 0..self.spawn_count() {
+            let bun = f(cx);
+            cx.spawn_world_space(bun);
+        }
     }
 
     /// Counts how many projectiles should spawn
@@ -235,28 +257,25 @@ impl<T, F> StandardSpawner<T, F> {
     }
 }
 
-impl<T, F, U> ProjectileSpawner for StandardSpawner<T, F>
+impl<T, F, U> Projectile for StandardSpawner<T, F>
 where
     T: ProjectileSpawning,
     F: FnMut(&mut Rng, &ProjectileContext) -> U + Send + Sync + 'static,
     U: ProjectileBundle + 'static,
 {
-    fn spawn_projectile(
-        &mut self,
-        cx: &mut crate::ProjectileContext,
-    ) -> Option<impl ProjectileBundle + use<T, F, U>> {
-        self.spawning.spawn(|| (self.spawn_fn)(&mut self.rng, cx))
-    }
-
-    fn space(&self) -> crate::ProjectileSpace {
-        self.space
-    }
-
-    fn update(&mut self, _: &mut crate::ProjectileContext, dt: f32) {
+    fn update(&mut self, cx: &mut crate::ProjectileContext, dt: f32) {
         self.spawning.update(dt);
+        match self.space {
+            ProjectileSpace::Local => self
+                .spawning
+                .spawn_local(cx, |cx| (self.spawn_fn)(&mut self.rng, cx)),
+            ProjectileSpace::World => self
+                .spawning
+                .spawn_world(cx, |cx| (self.spawn_fn)(&mut self.rng, cx)),
+        }
     }
 
-    fn is_complete(&self, _: &crate::ProjectileContext) -> bool {
+    fn is_expired(&self, _: &ProjectileContext) -> bool {
         self.spawning.finished()
     }
 

@@ -58,13 +58,12 @@ where
 mod test {
     use bevy::{render::view::Visibility, transform::components::Transform};
 
-    use crate::{Projectile, ProjectileSpawner};
+    use crate::Projectile;
 
     use super::ProjectileBundle;
 
     struct Dummy;
 
-    impl ProjectileSpawner for Dummy {}
     impl Projectile for Dummy {}
 
     fn bun0() -> impl ProjectileBundle {

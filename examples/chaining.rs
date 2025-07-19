@@ -38,14 +38,14 @@ fn setup(
         Transform::from_translation(Vec3::new(10., 10., -10.)).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
-    commands.spawn(ProjectileInstance::spawner(
+    commands.spawn(ProjectileInstance::new(
         SpawnRate::new(4.).into_spawner_world(|rng, _| {
             (
                 MyProjectile {
                     velocity: (rng.random_circle() * 4.).extend(10.0).xzy(),
                     rng: rng.fork(),
                 }
-                .with_spawner(SpawnRate::new(12.).into_spawner_world(|_, cx| {
+                .with_extension(SpawnRate::new(12.).into_spawner_world(|_, cx| {
                     (
                         MyProjectile3,
                         Transform::from_translation(cx.global_transform().translation()),
