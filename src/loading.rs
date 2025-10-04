@@ -4,8 +4,8 @@ use bevy::{
     asset::{AssetPath, AssetServer, Assets},
     ecs::{bundle::Bundle, world::FilteredResourcesMut},
     pbr::{Material, MeshMaterial3d},
-    render::mesh::{Mesh, Mesh2d, Mesh3d},
-    sprite::{Material2d, MeshMaterial2d},
+    mesh::{Mesh, Mesh2d, Mesh3d},
+    sprite_render::{Material2d, MeshMaterial2d},
 };
 
 use crate::BundleOrAsset;

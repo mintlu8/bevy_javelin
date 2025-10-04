@@ -13,7 +13,7 @@ use bevy::{
         hierarchy::Children,
         world::{EntityMutExcept, Mut},
     },
-    render::view::Visibility,
+    camera::visibility::Visibility,
     transform::components::Transform,
 };
 
@@ -31,6 +31,11 @@ pub enum ProjectileSpace {
 }
 
 /// A projectile or a spawner.
+///
+/// # Spawner
+///
+/// For spawner you should always overwrite `on_expire` since the default behavior despawns the entity,
+/// which is not desired since you should want to wait for other projectiles to finish.
 #[allow(unused_variables)]
 pub trait Projectile: Send + Sync + 'static {
     /// Optional value that is used to calculate `fac` and
@@ -149,6 +154,13 @@ impl ProjectileRc {
         match self {
             ProjectileRc::Owned(rc) => *self = ProjectileRc::Released(Arc::downgrade(rc)),
             ProjectileRc::Released(_) => (),
+        }
+    }
+
+    pub fn strong_count(&self) -> usize {
+        match self {
+            ProjectileRc::Owned(rc) => Arc::strong_count(rc),
+            ProjectileRc::Released(rc) => Weak::strong_count(rc),
         }
     }
 

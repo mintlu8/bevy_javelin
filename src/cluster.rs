@@ -1,10 +1,7 @@
 use std::any::{Any, type_name};
 
 use bevy::ecs::{
-    entity::Entity,
-    event::{Event, EventReader},
-    hierarchy::{ChildOf, Children},
-    system::Query,
+    entity::Entity, hierarchy::{ChildOf, Children}, message::{Message, MessageReader}, system::Query
 };
 
 use crate::{
@@ -12,6 +9,7 @@ use crate::{
     traits::{ErasedProjectile, ProjectileRc},
 };
 
+/// A loosely associated group of spawners and projectiles as a single object that shares garbage collection.
 #[derive(Debug, Clone)]
 pub struct ProjectileCluster<T: Projectile>(Vec<T>);
 
@@ -63,7 +61,7 @@ impl<T: Projectile> ErasedProjectile for ProjectileCluster<T> {
 }
 
 /// An [`Event`] that applies to a single projectile.
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct ProjectileCommand(Entity, Box<dyn Any + Send + Sync>);
 
 impl ProjectileCommand {
@@ -73,7 +71,7 @@ impl ProjectileCommand {
 }
 
 pub fn projectile_command_system(
-    mut reader: EventReader<ProjectileCommand>,
+    mut reader: MessageReader<ProjectileCommand>,
     mut projectiles: Query<&mut ProjectileInstance>,
     children: Query<&Children>,
 ) {

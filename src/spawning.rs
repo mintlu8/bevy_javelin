@@ -279,6 +279,9 @@ where
         self.spawning.finished()
     }
 
+    // Overwrite deletion behavior.
+    fn on_expire(&mut self, _: &mut ProjectileContext) {}
+
     fn children(
         &self,
         cx: &bevy::ecs::world::EntityMutExcept<impl bevy::ecs::bundle::Bundle>,

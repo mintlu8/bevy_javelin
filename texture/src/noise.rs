@@ -1,5 +1,6 @@
-use crate::{ImageBuilder, IntoImageBuilder};
-use bevy::math::{Vec2, Vec3};
+use crate::{b2n2, b2n3, ImageBuilder, IntoImageBuilder};
+use noiz_math::{Vec2, Vec3};
+use bevy::math::Vec2 as BVec2;
 use noiz::{
     Noise, NoiseFunction, SampleableFor,
     cells::OrthoGrid,
@@ -28,16 +29,16 @@ impl<T: NoiseFunction<Vec2, Output: Into<f32> + NoiseFunction<Vec2, Output: Into
 }
 
 impl<T: NoiseFunction<Vec2, Output: Into<f32>>> ImageBuilder for NoiseImage<T> {
-    fn sample(&self, position: Vec2) -> f32 {
-        self.0.sample(position)
+    fn sample(&self, position: BVec2) -> f32 {
+        self.0.sample(b2n2(position))
     }
 }
 
 pub struct NoiseImage3d<T>(Noise<T>, f32);
 
 impl<T: NoiseFunction<Vec3, Output: Into<f32>>> ImageBuilder for NoiseImage3d<T> {
-    fn sample(&self, position: Vec2) -> f32 {
-        self.0.sample(position.extend(self.1))
+    fn sample(&self, position: BVec2) -> f32 {
+        self.0.sample(b2n3(position.extend(self.1)))
     }
 }
 

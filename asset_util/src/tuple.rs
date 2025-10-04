@@ -1,5 +1,5 @@
 use bevy::{ecs::system::SystemParam, prelude::*};
-use std::any::TypeId;
+use std::{any::TypeId, marker::PhantomData};
 
 type Item<'w, 's, T> = <<T as AssetTuple>::Param as SystemParam>::Item<'w, 's>;
 
@@ -31,7 +31,7 @@ fn transmute<A: 'static, B: 'static>(item: A) -> Result<B, A> {
 fn transmute_handle<A: Asset, B: Asset>(item: Handle<A>) -> Handle<B> {
     match item {
         Handle::Strong(strong_handle) => Handle::Strong(strong_handle),
-        Handle::Weak(asset_id) => Handle::Weak(asset_id.untyped().typed()),
+        Handle::Uuid(uuid, _) => Handle::Uuid(uuid, PhantomData),
     }
 }
 

@@ -1,5 +1,6 @@
 #![allow(clippy::new_without_default)]
 #![allow(clippy::field_reassign_with_default)]
+mod border;
 mod distortion;
 mod lazy;
 mod noise;
@@ -23,6 +24,24 @@ pub use wave::*;
 
 #[doc(hidden)]
 pub use bevy::image::ImageAddressMode;
+
+use crate::border::EdgeGappedImageBuilder;
+
+pub(crate) fn n2b2(v: noiz_math::Vec2) -> bevy::math::Vec2 {
+    bevy::math::Vec2::from_array(v.to_array())
+}
+
+pub(crate) fn n2b3(v: noiz_math::Vec3) -> bevy::math::Vec3 {
+    bevy::math::Vec3::from_array(v.to_array())
+}
+
+pub(crate) fn b2n2(v: bevy::math::Vec2) -> noiz_math::Vec2 {
+    noiz_math::Vec2::from_array(v.to_array())
+}
+
+pub(crate) fn b2n3(v: bevy::math::Vec3) -> noiz_math::Vec3 {
+    noiz_math::Vec3::from_array(v.to_array())
+}
 
 pub trait ImageBuilder {
     /// Sample a single value at a point.
@@ -149,6 +168,75 @@ pub trait IntoImageBuilder: Sized {
         DistortionImage {
             base: self.into_image_builder(),
             distortion: JoinXY(x, y),
+        }
+    }
+
+    /// For non-colored noises, interpolate values near the borders to 0.
+    fn with_noise_fadeout(self, border: f32) -> impl ImageBuilder {
+        NoiseMappedSampler {
+            base: self.into_image_builder(),
+            function: move |x, v| {
+                let d = 0.5 - (x - Vec2::new(0.5, 0.5)).abs().max_element();
+                let a = d.clamp(0., border) / border;
+                v * a
+            },
+        }
+    }
+
+    /// For non-colored noises, interpolate values near the borders columns to 0.
+    fn with_noise_fadeout_x(self, border: f32) -> impl ImageBuilder {
+        NoiseMappedSampler {
+            base: self.into_image_builder(),
+            function: move |x, v| {
+                let d = (0.5 - x.x).abs();
+                let a = d.clamp(0., border) / border;
+                v * a
+            },
+        }
+    }
+
+    /// For non-colored noises, interpolate values near the borders rows to 0.
+    fn with_noise_fadeout_y(self, border: f32) -> impl ImageBuilder {
+        NoiseMappedSampler {
+            base: self.into_image_builder(),
+            function: move |x, v| {
+                let d = (0.5 - x.y).abs();
+                let a = d.clamp(0., border) / border;
+                v * a
+            },
+        }
+    }
+
+    /// Set the edge border and columns to be transparent.
+    ///
+    /// Note this effect should be called last and will not persist if chained.
+    fn with_transparent_borders(self) -> EdgeGappedImageBuilder<impl ImageBuilder> {
+        EdgeGappedImageBuilder {
+            x: true,
+            y: true,
+            builder: self.into_image_builder(),
+        }
+    }
+
+    /// Set the border columns to be transparent.
+    ///
+    /// Note this effect should be called last and will not persist if chained.
+    fn with_transparent_x_border(self) -> EdgeGappedImageBuilder<impl ImageBuilder> {
+        EdgeGappedImageBuilder {
+            x: true,
+            y: false,
+            builder: self.into_image_builder(),
+        }
+    }
+
+    /// Set the border rows to be transparent.
+    ///
+    /// Note this effect should be called last and will not persist if chained.
+    fn with_transparent_y_border(self) -> EdgeGappedImageBuilder<impl ImageBuilder> {
+        EdgeGappedImageBuilder {
+            x: false,
+            y: true,
+            builder: self.into_image_builder(),
         }
     }
 

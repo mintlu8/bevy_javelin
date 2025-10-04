@@ -43,7 +43,7 @@ pub fn projectile_update(
         &'static mut ProjectileInstance,
         &'static mut Transform,
         &'static GlobalTransform,
-        EntityMutExcept<'static, DefaultProjectileBundle>,
+        EntityMutExcept<'static, 'static, DefaultProjectileBundle>,
     )>,
     mut tracking: Query<
         (&'static Transform, &'static GlobalTransform),
@@ -95,7 +95,7 @@ pub struct ProjectilePlugin;
 
 impl Plugin for ProjectilePlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<ProjectileCommand>();
+        app.add_message::<ProjectileCommand>();
         let system = (
             FilteredResourcesMutParamBuilder::new(|builder| {
                 builder.add_write_all();

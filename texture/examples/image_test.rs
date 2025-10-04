@@ -1,16 +1,8 @@
 use bevy::{
-    DefaultPlugins,
-    app::{App, Startup, Update},
-    asset::Handle,
-    core_pipeline::core_2d::Camera2d,
-    ecs::{
+    app::{App, Startup, Update}, asset::Handle, camera::Camera2d, ecs::{
         hierarchy::ChildOf,
         system::{Commands, Query, ResMut},
-    },
-    image::Image,
-    input::{ButtonInput, keyboard::KeyCode},
-    math::Vec2,
-    sprite::Sprite,
+    }, image::Image, input::{keyboard::KeyCode, ButtonInput}, math::Vec2, sprite::Sprite, DefaultPlugins
 };
 use bevy_asset_util::{AssetCacheLayer, CachedAssetServer};
 use bevy_rectray::{

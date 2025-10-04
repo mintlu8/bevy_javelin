@@ -13,11 +13,9 @@ use bevy::{
     },
     math::Vec3,
     pbr::{Material, MeshMaterial3d},
-    render::{
-        mesh::{Mesh, Mesh2d, Mesh3d},
-        view::Visibility,
-    },
-    sprite::{Material2d, MeshMaterial2d},
+    mesh::{Mesh, Mesh2d, Mesh3d},
+    camera::prelude::Visibility,
+    sprite_render::{Material2d, MeshMaterial2d},
     transform::components::{GlobalTransform, Transform},
 };
 use bevy_asset_util::AsAssetsMut;
@@ -32,7 +30,7 @@ use crate::{
 pub struct ProjectileContext<'w, 's> {
     pub(crate) transform: Mut<'s, Transform>,
     pub(crate) global_transform: &'s GlobalTransform,
-    pub(crate) entity_mut: EntityMutExcept<'s, DefaultProjectileBundle>,
+    pub(crate) entity_mut: EntityMutExcept<'w, 's, DefaultProjectileBundle>,
     pub(crate) resources: FilteredResourcesMut<'w, 's>,
     pub(crate) tracking:
         Query<'w, 's, (&'static Transform, &'static GlobalTransform), Without<ProjectileInstance>>,
@@ -45,7 +43,7 @@ pub struct ProjectileContext<'w, 's> {
             &'static mut ProjectileInstance,
             &'static mut Transform,
             &'static GlobalTransform,
-            EntityMutExcept<'static, DefaultProjectileBundle>,
+            EntityMutExcept<'static, 'static, DefaultProjectileBundle>,
         ),
     >,
     pub(crate) commands: Commands<'w, 's>,
@@ -277,6 +275,11 @@ impl ProjectileContext<'_, '_> {
         self.parent()
             .and_then(|e| self.unsafe_other.get(e).ok())
             .and_then(|(.., entity)| entity.get())
+    }
+
+    /// Returns the strong count of the projectile reference counter.
+    pub fn strong_count(&self) -> usize {
+        self.rc.strong_count()
     }
 }
 

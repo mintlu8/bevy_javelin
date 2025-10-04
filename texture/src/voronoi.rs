@@ -1,4 +1,4 @@
-use bevy::math::{Vec2, Vec3};
+use noiz_math::{Vec2, Vec3};
 use noiz::{
     Noise,
     cell_noise::WorleyMode,

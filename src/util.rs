@@ -256,7 +256,7 @@ impl Counter {
 
 /// A dynamic value getter that retains its previous value
 /// if the value source is removed.
-/// 
+///
 /// This is useful for tracking projectiles.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RetainedValue<T>(pub T);

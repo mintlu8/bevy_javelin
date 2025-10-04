@@ -91,7 +91,7 @@ impl<T: Asset> LazyAssetCell<T> {
         let handle = cx.add((self.create)());
         match &handle {
             Handle::Strong(strong_handle) => *value = Some(Arc::downgrade(strong_handle)),
-            Handle::Weak(_) => (),
+            Handle::Uuid(..) => (),
         }
         handle
     }
