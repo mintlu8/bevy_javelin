@@ -6,6 +6,7 @@ use std::{
 };
 
 use bevy::{
+    camera::visibility::Visibility,
     ecs::{
         bundle::Bundle,
         component::Component,
@@ -13,7 +14,6 @@ use bevy::{
         hierarchy::Children,
         world::{EntityMutExcept, Mut},
     },
-    camera::visibility::Visibility,
     transform::components::Transform,
 };
 

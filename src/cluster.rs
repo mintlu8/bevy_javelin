@@ -1,7 +1,10 @@
 use std::any::{Any, type_name};
 
 use bevy::ecs::{
-    entity::Entity, hierarchy::{ChildOf, Children}, message::{Message, MessageReader}, system::Query
+    entity::Entity,
+    hierarchy::{ChildOf, Children},
+    message::{Message, MessageReader},
+    system::Query,
 };
 
 use crate::{

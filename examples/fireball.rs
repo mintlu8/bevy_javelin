@@ -3,11 +3,12 @@
 //! https://www.youtube.com/watch?v=dPJQuD93-Ks
 
 use bevy::{
-    core_pipeline::bloom::Bloom,
     math::VectorSpace,
     pbr::{ExtendedMaterial, MaterialExtension},
+    post_process::bloom::Bloom,
     prelude::*,
-    render::render_resource::{AsBindGroup, ShaderRef},
+    render::{render_resource::AsBindGroup, view::Hdr},
+    shader::ShaderRef,
 };
 use bevy_javelin::{
     Projectile, ProjectileContext, ProjectileInstance, ProjectilePlugin,
@@ -80,10 +81,8 @@ fn setup(
 ) {
     commands.spawn((
         Camera3d::default(),
-        Camera {
-            hdr: true,
-            ..Default::default()
-        },
+        Camera::default(),
+        Hdr,
         Transform::from_xyz(0.0, 7., 30.0).looking_at(Vec3::new(0., 0., 0.), Vec3::Y),
         Bloom::NATURAL,
     ));

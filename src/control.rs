@@ -1,6 +1,5 @@
 use bevy::{
-    asset::{Asset, AssetId, Assets, Handle},
-    ecs::{
+    asset::{Asset, AssetId, AssetMut, Assets, Handle}, camera::prelude::Visibility, ecs::{
         bundle::Bundle,
         change_detection::DetectChanges,
         component::{Component, Mutable},
@@ -10,13 +9,7 @@ use bevy::{
         relationship::{Relationship, RelationshipTarget},
         system::{Command, Commands, EntityCommands, Query},
         world::{EntityMutExcept, FilteredResourcesMut, Mut},
-    },
-    math::Vec3,
-    pbr::{Material, MeshMaterial3d},
-    mesh::{Mesh, Mesh2d, Mesh3d},
-    camera::prelude::Visibility,
-    sprite_render::{Material2d, MeshMaterial2d},
-    transform::components::{GlobalTransform, Transform},
+    }, math::Vec3, mesh::{Mesh, Mesh2d, Mesh3d}, pbr::{Material, MeshMaterial3d}, sprite_render::{Material2d, MeshMaterial2d}, transform::components::{GlobalTransform, Transform},
 };
 use bevy_asset_util::AsAssetsMut;
 
@@ -145,7 +138,7 @@ impl ProjectileContext<'_, '_> {
     }
 
     /// Obtain a mesh.
-    pub fn mesh3d(&mut self, f: impl FnOnce(&mut Mesh)) {
+    pub fn mesh3d(&mut self, f: impl FnOnce(AssetMut<Mesh>)) {
         self.resources
             .get_mut::<Assets<Mesh>>()
             .ok()
@@ -157,7 +150,7 @@ impl ProjectileContext<'_, '_> {
     }
 
     /// Obtain a mesh.
-    pub fn mesh2d(&mut self, f: impl FnOnce(&mut Mesh)) {
+    pub fn mesh2d(&mut self, f: impl FnOnce(AssetMut<Mesh>)) {
         self.resources
             .get_mut::<Assets<Mesh>>()
             .ok()
@@ -169,7 +162,7 @@ impl ProjectileContext<'_, '_> {
     }
 
     /// Obtain a material.
-    pub fn mat3d<M: Material>(&mut self, f: impl FnOnce(&mut M)) {
+    pub fn mat3d<M: Material>(&mut self, f: impl FnOnce(AssetMut<M>)) {
         self.resources
             .get_mut::<Assets<M>>()
             .ok()
@@ -181,7 +174,7 @@ impl ProjectileContext<'_, '_> {
     }
 
     /// Obtain a material.
-    pub fn mat2d<M: Material2d>(&mut self, f: impl FnOnce(&mut M)) {
+    pub fn mat2d<M: Material2d>(&mut self, f: impl FnOnce(AssetMut<M>)) {
         self.resources
             .get_mut::<Assets<M>>()
             .ok()
@@ -193,7 +186,7 @@ impl ProjectileContext<'_, '_> {
     }
 
     /// Obtain an asset.
-    pub fn asset<A: Asset>(&mut self, id: impl Into<AssetId<A>>, f: impl FnOnce(&mut A)) {
+    pub fn asset<A: Asset>(&mut self, id: impl Into<AssetId<A>>, f: impl FnOnce(AssetMut<A>)) {
         self.resources
             .get_mut::<Assets<A>>()
             .ok()

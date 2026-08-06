@@ -56,7 +56,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use bevy::{render::view::Visibility, transform::components::Transform};
+    use bevy::{prelude::Visibility, transform::components::Transform};
 
     use crate::Projectile;
 

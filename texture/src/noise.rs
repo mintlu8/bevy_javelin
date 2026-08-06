@@ -1,5 +1,4 @@
-use crate::{b2n2, b2n3, ImageBuilder, IntoImageBuilder};
-use noiz_math::{Vec2, Vec3};
+use crate::{ImageBuilder, IntoImageBuilder, b2n2, b2n3};
 use bevy::math::Vec2 as BVec2;
 use noiz::{
     Noise, NoiseFunction, SampleableFor,
@@ -11,6 +10,7 @@ use noiz::{
     },
     rng::NoiseRng,
 };
+use noiz_math::{Vec2, Vec3};
 
 pub struct NoiseImage<T>(pub Noise<T>);
 

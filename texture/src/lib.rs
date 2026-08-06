@@ -43,6 +43,9 @@ pub(crate) fn b2n3(v: bevy::math::Vec3) -> noiz_math::Vec3 {
     noiz_math::Vec3::from_array(v.to_array())
 }
 
+pub type NoizVec2 = noiz_math::Vec2;
+pub type NoizVec3 = noiz_math::Vec3;
+
 pub trait ImageBuilder {
     /// Sample a single value at a point.
     ///
@@ -270,9 +273,22 @@ impl<A: ImageBuilder, B: ImageBuilder> ImageBuilder for ImageMultiply<A, B> {
     }
 }
 
-struct FunctionSampler<F: Fn(Vec2) -> Vec4>(F);
+pub struct FunctionSampler<F: Fn(Vec2) -> f32>(pub F);
 
-impl<F: Fn(Vec2) -> Vec4> ImageBuilder for FunctionSampler<F> {
+impl<F: Fn(Vec2) -> f32> ImageBuilder for FunctionSampler<F> {
+    fn sample(&self, position: Vec2) -> f32 {
+        (self.0)(position)
+    }
+
+    fn sample_color(&self, position: Vec2) -> Vec4 {
+        let v = (self.0)(position);
+        Vec4::new(v, v, v, 1.0)
+    }
+}
+
+pub struct ColoredFnSampler<F: Fn(Vec2) -> Vec4>(pub F);
+
+impl<F: Fn(Vec2) -> Vec4> ImageBuilder for ColoredFnSampler<F> {
     fn sample(&self, position: Vec2) -> f32 {
         (self.0)(position).x
     }

@@ -3,15 +3,17 @@ mod tuple;
 pub use as_asset::AsAssetsMut;
 pub use tuple::AssetTuple;
 
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use bevy::{
-    asset::{Asset, AssetPath, AssetServer, Handle, StrongHandle, UntypedHandle},
+    app::App,
+    asset::{Asset, AssetId, AssetPath, AssetServer, Assets, Handle, StrongHandle, UntypedHandle},
     ecs::{
         resource::Resource,
         system::{Res, ResMut, StaticSystemParam, SystemParam},
     },
     prelude::{Deref, DerefMut},
+    shader::{Shader, ShaderRef},
 };
 
 /// A temporary cache that keeps a set of assets alive.
@@ -105,5 +107,94 @@ impl<T: Asset> LazyAssetCell<T> {
             }
         }
         None
+    }
+}
+
+/// A static compatible lazy construction of assets.
+pub struct LazyShader {
+    lock: OnceLock<Handle<Shader>>,
+    file: &'static str,
+    wgsl: &'static str,
+}
+
+impl LazyShader {
+    pub const fn new(file: &'static str, wgsl: &'static str) -> Self {
+        LazyShader {
+            lock: OnceLock::new(),
+            file,
+            wgsl,
+        }
+    }
+
+    /// Create this asset and hold it temporarily.
+    pub fn shader_ref(&self) -> ShaderRef {
+        if let Some(handle) = self.lock.get() {
+            ShaderRef::Handle(handle.clone())
+        } else {
+            panic!("Shader {} not loaded.", self.file)
+        }
+    }
+
+    /// Create this asset and hold it temporarily.
+    pub fn get(&self) -> Handle<Shader> {
+        if let Some(handle) = self.lock.get() {
+            handle.clone()
+        } else {
+            panic!("Shader {} not loaded.", self.file)
+        }
+    }
+}
+
+/// A static compatible lazy construction of assets.
+pub struct LazyAsset<T: Asset> {
+    lock: OnceLock<Handle<T>>,
+    create: fn() -> T,
+}
+
+impl<T: Asset> LazyAsset<T> {
+    pub const fn new(create: fn() -> T) -> Self {
+        LazyAsset {
+            lock: OnceLock::new(),
+            create,
+        }
+    }
+
+    pub fn get(&self) -> Handle<T> {
+        if let Some(handle) = self.lock.get() {
+            handle.clone()
+        } else {
+            panic!("Handle not loaded.")
+        }
+    }
+
+    pub fn id(&self) -> AssetId<T> {
+        if let Some(handle) = self.lock.get() {
+            handle.id()
+        } else {
+            panic!("Handle not loaded.")
+        }
+    }
+}
+
+pub trait LazyShaderExt {
+    fn load_shader(&mut self, shader: &LazyShader);
+    fn load_lazy_asset<T: Asset>(&mut self, shader: &LazyAsset<T>);
+}
+
+impl LazyShaderExt for App {
+    fn load_shader(&mut self, shader: &LazyShader) {
+        let id = self
+            .world_mut()
+            .resource_mut::<Assets<Shader>>()
+            .add(Shader::from_wgsl(shader.wgsl, shader.file));
+        let _ = shader.lock.set(id);
+    }
+
+    fn load_lazy_asset<T: Asset>(&mut self, asset: &LazyAsset<T>) {
+        let id = self
+            .world_mut()
+            .resource_mut::<Assets<T>>()
+            .add((asset.create)());
+        let _ = asset.lock.set(id);
     }
 }

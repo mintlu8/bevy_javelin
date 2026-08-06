@@ -3,8 +3,8 @@
 use bevy::{
     asset::{AssetPath, AssetServer, Assets},
     ecs::{bundle::Bundle, world::FilteredResourcesMut},
-    pbr::{Material, MeshMaterial3d},
     mesh::{Mesh, Mesh2d, Mesh3d},
+    pbr::{Material, MeshMaterial3d},
     sprite_render::{Material2d, MeshMaterial2d},
 };
 
