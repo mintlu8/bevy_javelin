@@ -1,14 +1,6 @@
 use bevy::{
     asset::{Asset, AssetId, AssetMut, Assets, Handle}, camera::prelude::Visibility, ecs::{
-        bundle::Bundle,
-        change_detection::DetectChanges,
-        component::{Component, Mutable},
-        entity::{ContainsEntity, Entity, EntityEquivalent},
-        hierarchy::ChildOf,
-        query::Without,
-        relationship::{Relationship, RelationshipTarget},
-        system::{Command, Commands, EntityCommands, Query},
-        world::{EntityMutExcept, FilteredResourcesMut, Mut},
+        bundle::Bundle, change_detection::DetectChanges, component::{Component, Mutable}, entity::{ContainsEntity, Entity, EntityEquivalent}, hierarchy::ChildOf, query::Without, relationship::{Relationship, RelationshipTarget}, resource::IsResource, system::{Command, Commands, EntityCommands, Query}, world::{EntityMutExcept, FilteredResourcesMut, Mut},
     }, math::Vec3, mesh::{Mesh, Mesh2d, Mesh3d}, pbr::{Material, MeshMaterial3d}, sprite_render::{Material2d, MeshMaterial2d}, transform::components::{GlobalTransform, Transform},
 };
 use bevy_asset_util::AsAssetsMut;
@@ -26,7 +18,7 @@ pub struct ProjectileContext<'w, 's> {
     pub(crate) entity_mut: EntityMutExcept<'w, 's, DefaultProjectileBundle>,
     pub(crate) resources: FilteredResourcesMut<'w, 's>,
     pub(crate) tracking:
-        Query<'w, 's, (&'static Transform, &'static GlobalTransform), Without<ProjectileInstance>>,
+        Query<'w, 's, (&'static Transform, &'static GlobalTransform), (Without<ProjectileInstance>, Without<IsResource>)>,
     // Safety: cannot offer access to this entity.
     pub(crate) unsafe_other: Query<
         'w,
@@ -37,7 +29,7 @@ pub struct ProjectileContext<'w, 's> {
             &'static mut Transform,
             &'static GlobalTransform,
             EntityMutExcept<'static, 'static, DefaultProjectileBundle>,
-        ),
+        ),Without<IsResource>
     >,
     pub(crate) commands: Commands<'w, 's>,
     pub(crate) rc: &'s ProjectileRc,

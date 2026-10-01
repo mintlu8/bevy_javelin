@@ -1,18 +1,11 @@
 #![doc = include_str!("../README.md")]
 #![allow(clippy::type_complexity)]
 use bevy::{
-    app::{App, Plugin, Update},
-    ecs::{
-        entity::Entity,
-        query::Without,
-        schedule::IntoScheduleConfigs,
-        system::{
+    app::{App, Plugin, Update}, ecs::{
+        entity::Entity, query::Without, resource::IsResource, schedule::IntoScheduleConfigs, system::{
             Commands, FilteredResourcesMutParamBuilder, ParamBuilder, Query, SystemParamBuilder,
-        },
-        world::{EntityMutExcept, FilteredResourcesMut},
-    },
-    time::{Time, Virtual},
-    transform::components::{GlobalTransform, Transform},
+        }, world::{EntityMutExcept, FilteredResourcesMut},
+    }, time::{Time, Virtual}, transform::components::{GlobalTransform, Transform},
 };
 
 mod builder;
@@ -44,10 +37,11 @@ pub fn projectile_update(
         &'static mut Transform,
         &'static GlobalTransform,
         EntityMutExcept<'static, 'static, DefaultProjectileBundle>,
-    )>,
+    ), Without<IsResource>>,
     mut tracking: Query<
         (&'static Transform, &'static GlobalTransform),
-        Without<ProjectileInstance>,
+        (Without<ProjectileInstance>,
+        Without<IsResource>,)
     >,
 ) {
     let Ok((dt, elapsed)) = resources

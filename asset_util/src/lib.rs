@@ -9,8 +9,10 @@ use bevy::{
     app::App,
     asset::{Asset, AssetId, AssetPath, AssetServer, Assets, Handle, StrongHandle, UntypedHandle},
     ecs::{
+        error::BevyError,
         resource::Resource,
         system::{Res, ResMut, StaticSystemParam, SystemParam},
+        template::{Template, TemplateContext},
     },
     prelude::{Deref, DerefMut},
     shader::{Shader, ShaderRef},
@@ -196,5 +198,23 @@ impl LazyShaderExt for App {
             .resource_mut::<Assets<T>>()
             .add((asset.create)());
         let _ = asset.lock.set(id);
+    }
+}
+
+impl<T: Asset> Template for &LazyAsset<T> {
+    type Output = Handle<T>;
+
+    fn build_template(&self, context: &mut TemplateContext) -> Result<Self::Output, BevyError> {
+        if let Some(asset) = self.lock.get() {
+            Ok(asset.clone())
+        } else {
+            let id = context.resource_mut::<Assets<T>>().add((self.create)());
+            let _ = self.lock.set(id.clone());
+            Ok(id)
+        }
+    }
+
+    fn clone_template(&self) -> Self {
+        *self
     }
 }
